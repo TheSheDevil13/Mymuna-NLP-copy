@@ -163,8 +163,8 @@ function ChatPage() {
   return (
     <div className="chat-container">
       <div className="chat-header">
-        <h1>Bangla NLP</h1>
-        <p>{language === 'bn' ? 'বাংলা ভয়েস চ্যাট' : 'Voice Chat'}</p>
+        <h1>{language === 'bn' ? 'Bangla NLP' : 'English NLP'}</h1>
+        <p>{language === 'bn' ? 'বাংলা ভয়েস চ্যাট' : 'English Voice Chat'}</p>
 
         <div className="language-toggle">
           <span className={language === 'bn' ? 'active' : ''}>বাংলা</span>
