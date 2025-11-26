@@ -1,0 +1,53 @@
+# Google Cloud credentials
+key.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Audio files
+*.wav
+*.webm
+*.mp3
+recording.wav
+temp_recording.wav
+output.wav
+google_tts_output.wav
+bangla_speech.wav
+response_audio.wav
+
+# TTS models
+/tts_models/
+
+# Node modules
+node_modules/
+frontend/node_modules/
+
+# Frontend build
+frontend/dist/
+frontend/.vite/
+
+# Environment
+.env
+.venv
+env/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+*.log
+logs/

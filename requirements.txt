@@ -1,0 +1,9 @@
+SpeechRecognition
+PyAudio
+google-cloud-speech
+google-cloud-texttospeech
+BanglaTTS
+google-cloud-aiplatform
+fastapi
+uvicorn
+python-multipart
