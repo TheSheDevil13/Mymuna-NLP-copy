@@ -1,5 +1,5 @@
 from google.cloud import aiplatform
-from vertexai.generative_models import GenerativeModel
+from vertexai.generative_models import GenerativeModel, Part
 from pathlib import Path
 import os
 import json
@@ -29,14 +29,13 @@ with open(prompts_path, 'r', encoding='utf-8') as f:
 # mode can be 'chat' or 'object_detection'
 chat_sessions = {}
 
-def get_system_prompt(mode='chat', language_code='bn-BD', detected_objects=None):
+def get_system_prompt(mode='chat', language_code='bn-BD'):
     """
     Load the appropriate system prompt based on mode and language code.
 
     Args:
         mode (str): 'chat' or 'object_detection'
         language_code (str): Language code (e.g., 'bn-BD' for Bangla, 'en-US' for English)
-        detected_objects (str): For object_detection mode, the detected objects string
 
     Returns:
         str: The system prompt text
@@ -47,34 +46,31 @@ def get_system_prompt(mode='chat', language_code='bn-BD', detected_objects=None)
     # Get the appropriate prompt
     prompt = SYSTEM_PROMPTS[mode][lang_key]
 
-    # For object detection, replace the placeholder with detected objects
-    if mode == 'object_detection' and detected_objects:
-        prompt = prompt.format(detected_objects=detected_objects)
-
     return prompt
 
-def get_or_create_chat_session(mode='chat', language_code='bn-BD', detected_objects=None):
+def get_or_create_chat_session(mode='chat', language_code='bn-BD'):
     """
     Get existing chat session or create a new one for the given mode and language.
 
     Args:
         mode (str): 'chat' or 'object_detection'
         language_code (str): Language code (e.g., 'bn-BD' for Bangla, 'en-US' for English)
-        detected_objects (str): For object_detection mode, the detected objects string
 
     Returns:
         Chat session object
     """
     session_key = (mode, language_code)
 
-    # For object detection, always create a new session since the detected objects change
+    # For object detection, always create a new session since each interaction has a new image
     if mode == 'object_detection' or session_key not in chat_sessions:
         # Load system prompt for this mode and language
-        system_instruction = get_system_prompt(mode, language_code, detected_objects)
+        system_instruction = get_system_prompt(mode, language_code)
 
         # Create model with system instruction
+        # Use gemini-2.0-flash-exp for vision capabilities
+        model_name = "gemini-2.0-flash-exp" if mode == 'object_detection' else "gemini-2.5-flash-lite"
         model = GenerativeModel(
-            "gemini-2.5-flash-lite",
+            model_name,
             system_instruction=system_instruction
         )
 
@@ -83,7 +79,7 @@ def get_or_create_chat_session(mode='chat', language_code='bn-BD', detected_obje
 
     return chat_sessions[session_key]
 
-def send_message(user_msg, mode='chat', language_code='bn-BD', detected_objects=None):
+def send_message(user_msg, mode='chat', language_code='bn-BD', image_bytes=None):
     """
     Send a message to Gemini and get a response.
 
@@ -91,16 +87,24 @@ def send_message(user_msg, mode='chat', language_code='bn-BD', detected_objects=
         user_msg (str): The user's message.
         mode (str): 'chat' or 'object_detection' (default: 'chat')
         language_code (str): Language code (default: 'bn-BD' for Bangla)
-        detected_objects (str): For object_detection mode, the detected objects string
+        image_bytes (bytes): For object_detection mode, the image data
 
     Returns:
         str: The assistant's reply.
     """
     # Get or create chat session for this mode and language
-    chat = get_or_create_chat_session(mode, language_code, detected_objects)
+    chat = get_or_create_chat_session(mode, language_code)
 
-    # Send message and get response
-    response = chat.send_message(user_msg)
+    # For object detection with image, send multimodal content
+    if mode == 'object_detection' and image_bytes:
+        # Create image part from bytes
+        image_part = Part.from_data(data=image_bytes, mime_type="image/jpeg")
+
+        # Send both image and text
+        response = chat.send_message([image_part, user_msg])
+    else:
+        # Send text only
+        response = chat.send_message(user_msg)
 
     # Extract assistant text
     assistant_reply = response.text
