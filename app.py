@@ -6,12 +6,10 @@ from google.cloud import speech
 from GoogleSTT import runSTT_from_bytes
 from Gemini import send_message, reset_chat_session
 from GoogleTTS import runTTS
-from ObjectDetection import get_detection_sentence
 import uvicorn
 import base64
 import re
 from typing import Optional
-from PIL import Image
 
 app = FastAPI(title="Bangla Voice Chat API")
 
@@ -181,7 +179,7 @@ async def detect_objects_with_audio(
     language_code: Optional[str] = Form('bn-BD')
 ):
     """
-    Process image for object detection and audio for speech, then generate educational response.
+    Process image and audio, send both to Gemini for educational response about objects.
 
     Args:
         audio: Audio file (WebM format)
@@ -189,7 +187,7 @@ async def detect_objects_with_audio(
         language_code: Language code for STT and TTS (default: 'bn-BD' for Bangla)
 
     Returns:
-        JSON with user_text, assistant_text, detected_objects, and audio_base64
+        JSON with user_text, assistant_text, and audio_base64
     """
     try:
         # Read image file
@@ -202,18 +200,7 @@ async def detect_objects_with_audio(
         if not audio_bytes:
             raise HTTPException(status_code=400, detail="No audio data received")
 
-        # Step 1: Detect objects in the image
-        print("Detecting objects in image...")
-        try:
-            # Convert bytes to PIL Image
-            image_pil = Image.open(BytesIO(image_bytes))
-            detected_objects = get_detection_sentence(image_pil)
-            print(f"Detected: {detected_objects}")
-        except Exception as e:
-            print(f"Object Detection Error: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Object detection failed: {str(e)}")
-
-        # Step 2: Convert audio to text using STT
+        # Step 1: Convert audio to text using STT
         print("Converting audio to text...")
         encoding = speech.RecognitionConfig.AudioEncoding.WEBM_OPUS
         try:
@@ -227,14 +214,14 @@ async def detect_objects_with_audio(
 
         print(f"User said: {user_text}")
 
-        # Step 3: Get response from Gemini (object_detection mode)
-        print("Getting educational response from Gemini...")
+        # Step 2: Send image + text to Gemini (object_detection mode with vision)
+        print("Sending image and text to Gemini for analysis...")
         try:
             assistant_text = send_message(
                 user_text,
                 mode='object_detection',
                 language_code=language_code,
-                detected_objects=detected_objects
+                image_bytes=image_bytes
             )
         except Exception as e:
             print(f"Gemini Error: {str(e)}")
@@ -245,10 +232,10 @@ async def detect_objects_with_audio(
 
         print(f"Assistant replied: {assistant_text}")
 
-        # Step 4: Strip markdown for both TTS and display
+        # Step 3: Strip markdown for both TTS and display
         assistant_text_clean = strip_markdown(assistant_text)
 
-        # Step 5: Convert response to audio using TTS
+        # Step 4: Convert response to audio using TTS
         print("Converting response to audio...")
         try:
             response_audio_bytes = runTTS(assistant_text_clean, return_bytes=True, language_code=language_code)
@@ -256,14 +243,13 @@ async def detect_objects_with_audio(
             print(f"TTS Error: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Text-to-speech failed: {str(e)}")
 
-        # Step 6: Encode audio to base64 for JSON response
+        # Step 5: Encode audio to base64 for JSON response
         audio_base64 = base64.b64encode(response_audio_bytes).decode('utf-8')
 
         # Return JSON with all information
         return JSONResponse(
             content={
                 "user_text": user_text,
-                "detected_objects": detected_objects,
                 "assistant_text": assistant_text_clean,
                 "audio_base64": audio_base64
             },
