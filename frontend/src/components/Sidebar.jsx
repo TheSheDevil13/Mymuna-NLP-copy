@@ -27,6 +27,22 @@ function Sidebar() {
           <i className="bi bi-camera-video"></i>
           <span>Objects</span>
         </Nav.Link>
+        <Nav.Link
+          as={Link}
+          to="/lesson/liberation-war"
+          className={location.pathname === '/lesson/liberation-war' ? 'active' : ''}
+        >
+          <i className="bi bi-book"></i>
+          <span>Bangladesh Liberation War</span>
+        </Nav.Link>
+        <Nav.Link
+          as={Link}
+          to="/lesson/world-war-2"
+          className={location.pathname === '/lesson/world-war-2' ? 'active' : ''}
+        >
+          <i className="bi bi-book"></i>
+          <span>World War 2</span>
+        </Nav.Link>
       </Nav>
     </div>
   )
