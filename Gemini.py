@@ -20,75 +20,105 @@ aiplatform.init(
     location="us-central1"
 )
 
-# Global chat sessions stored by language code
+# Load system prompts from JSON
+prompts_path = script_dir / "system_prompts.json"
+with open(prompts_path, 'r', encoding='utf-8') as f:
+    SYSTEM_PROMPTS = json.load(f)
+
+# Global chat sessions stored by (mode, language_code)
+# mode can be 'chat' or 'object_detection'
 chat_sessions = {}
 
-def get_system_prompt(language_code='bn-BD'):
+def get_system_prompt(mode='chat', language_code='bn-BD', detected_objects=None):
     """
-    Load the appropriate system prompt based on language code.
-    
+    Load the appropriate system prompt based on mode and language code.
+
     Args:
+        mode (str): 'chat' or 'object_detection'
         language_code (str): Language code (e.g., 'bn-BD' for Bangla, 'en-US' for English)
-    
+        detected_objects (str): For object_detection mode, the detected objects string
+
     Returns:
         str: The system prompt text
     """
-    # Determine which system prompt file to use based on language
-    if language_code.startswith('en'):
-        system_prompt_path = script_dir / "system_prompt_en.txt"
-    else:
-        system_prompt_path = script_dir / "system_prompt.txt"
-    
-    with open(system_prompt_path, 'r', encoding='utf-8') as f:
-        return f.read().strip()
+    # Determine language key (bn or en)
+    lang_key = 'en' if language_code.startswith('en') else 'bn'
 
-def get_or_create_chat_session(language_code='bn-BD'):
+    # Get the appropriate prompt
+    prompt = SYSTEM_PROMPTS[mode][lang_key]
+
+    # For object detection, replace the placeholder with detected objects
+    if mode == 'object_detection' and detected_objects:
+        prompt = prompt.format(detected_objects=detected_objects)
+
+    return prompt
+
+def get_or_create_chat_session(mode='chat', language_code='bn-BD', detected_objects=None):
     """
-    Get existing chat session or create a new one for the given language.
-    
+    Get existing chat session or create a new one for the given mode and language.
+
     Args:
+        mode (str): 'chat' or 'object_detection'
         language_code (str): Language code (e.g., 'bn-BD' for Bangla, 'en-US' for English)
-    
+        detected_objects (str): For object_detection mode, the detected objects string
+
     Returns:
         Chat session object
     """
-    if language_code not in chat_sessions:
-        # Load system prompt for this language
-        system_instruction = get_system_prompt(language_code)
-        
+    session_key = (mode, language_code)
+
+    # For object detection, always create a new session since the detected objects change
+    if mode == 'object_detection' or session_key not in chat_sessions:
+        # Load system prompt for this mode and language
+        system_instruction = get_system_prompt(mode, language_code, detected_objects)
+
         # Create model with system instruction
         model = GenerativeModel(
             "gemini-2.5-flash-lite",
             system_instruction=system_instruction
         )
-        
-        # Start new chat session
-        chat_sessions[language_code] = model.start_chat()
-    
-    return chat_sessions[language_code]
 
-def send_message(user_msg, language_code='bn-BD'):
+        # Start new chat session
+        chat_sessions[session_key] = model.start_chat()
+
+    return chat_sessions[session_key]
+
+def send_message(user_msg, mode='chat', language_code='bn-BD', detected_objects=None):
     """
     Send a message to Gemini and get a response.
-    
+
     Args:
         user_msg (str): The user's message.
+        mode (str): 'chat' or 'object_detection' (default: 'chat')
         language_code (str): Language code (default: 'bn-BD' for Bangla)
-    
+        detected_objects (str): For object_detection mode, the detected objects string
+
     Returns:
         str: The assistant's reply.
     """
-    # Get or create chat session for this language
-    chat = get_or_create_chat_session(language_code)
-    
+    # Get or create chat session for this mode and language
+    chat = get_or_create_chat_session(mode, language_code, detected_objects)
+
     # Send message and get response
     response = chat.send_message(user_msg)
-    
+
     # Extract assistant text
     assistant_reply = response.text
-    
+
     return assistant_reply
 
+def reset_chat_session(mode='chat', language_code='bn-BD'):
+    """
+    Reset/clear the chat session for a given mode and language.
+
+    Args:
+        mode (str): 'chat' or 'object_detection'
+        language_code (str): Language code
+    """
+    session_key = (mode, language_code)
+    if session_key in chat_sessions:
+        del chat_sessions[session_key]
+
 if __name__ == "__main__":
-    response = send_message("Hello, how are you?")
+    response = send_message("Hello, how are you?", mode='chat', language_code='en-US')
     print(response)
