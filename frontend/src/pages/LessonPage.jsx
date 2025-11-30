@@ -3,12 +3,14 @@ import './LessonPage.css'
 
 const API_BASE_URL = import.meta.env.DEV ? '/api' : 'http://localhost:8000'
 
-function LessonPage({ topic }) {
+function LessonPage({ topic, language, setLanguage }) {
   const [isRecording, setIsRecording] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState(null)
-  const [language, setLanguage] = useState('bn')
   const [lessonStarted, setLessonStarted] = useState(false)
+  
+  // New state to store the real titles
+  const [lessonTitles, setLessonTitles] = useState(null)
 
   const mediaRecorderRef = useRef(null)
   const audioChunksRef = useRef([])
@@ -18,13 +20,29 @@ function LessonPage({ topic }) {
     return language === 'en' ? 'en-US' : 'bn-BD'
   }
 
-  const getTopicName = () => {
-    if (topic === 'liberation-war') {
-      return language === 'bn' ? 'বাংলাদেশের মুক্তিযুদ্ধ' : 'Bangladesh Liberation War'
-    } else if (topic === 'world-war-2') {
-      return language === 'bn' ? 'দ্বিতীয় বিশ্বযুদ্ধ' : 'World War 2'
+  // 1. Fetch the lesson list to find the correct title for this topic
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/lessons`)
+      .then(res => res.json())
+      .then(data => {
+        const currentLesson = data.find(l => l.id === topic)
+        if (currentLesson) {
+          setLessonTitles({
+            en: currentLesson.title_en,
+            bn: currentLesson.title_bn
+          })
+        }
+      })
+      .catch(err => console.error("Failed to load lesson details", err))
+  }, [topic])
+
+  // 2. Helper to display the correct title (or fallback to formatted ID)
+  const getDisplayTitle = () => {
+    if (lessonTitles) {
+      return language === 'bn' ? lessonTitles.bn : lessonTitles.en
     }
-    return topic
+    // Fallback: replace underscores/hyphens with spaces
+    return topic.replace(/_/g, ' ').replace(/-/g, ' ').toUpperCase()
   }
 
   useEffect(() => {
@@ -40,7 +58,7 @@ function LessonPage({ topic }) {
   }, [])
 
   const startLesson = async () => {
-    if (lessonStarted) return // Already started
+    if (lessonStarted) return
     
     setIsProcessing(true)
     setError(null)
@@ -65,7 +83,6 @@ function LessonPage({ topic }) {
       const data = await response.json()
       const audio_base64 = data.audio_base64
 
-      // Play audio response
       if (audio_base64) {
         const audioBytes = Uint8Array.from(atob(audio_base64), c => c.charCodeAt(0))
         const responseAudioBlob = new Blob([audioBytes], { type: 'audio/wav' })
@@ -97,8 +114,6 @@ function LessonPage({ topic }) {
   const startRecording = async () => {
     try {
       setError(null)
-      
-      // Start recording for user input
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           sampleRate: 16000,
@@ -124,7 +139,6 @@ function LessonPage({ topic }) {
       mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
         await sendAudioToBackend(audioBlob)
-
         stream.getTracks().forEach(track => track.stop())
       }
 
@@ -167,7 +181,6 @@ function LessonPage({ topic }) {
       const data = await response.json()
       const { audio_base64 } = data
 
-      // Play audio response
       if (audio_base64) {
         const audioBytes = Uint8Array.from(atob(audio_base64), c => c.charCodeAt(0))
         const responseAudioBlob = new Blob([audioBytes], { type: 'audio/wav' })
@@ -198,7 +211,8 @@ function LessonPage({ topic }) {
       <div className="lesson-container">
         <div className="lesson-section">
           <div className="lesson-header">
-            <h1>{getTopicName()}</h1>
+            {/* 3. Use the helper function here */}
+            <h1>{getDisplayTitle()}</h1>
             <p>{language === 'bn' ? 'ইন্টারেক্টিভ পাঠ' : 'Interactive Lesson'}</p>
             <div className="language-toggle">
               <span className={language === 'bn' ? 'active' : ''}>বাংলা</span>

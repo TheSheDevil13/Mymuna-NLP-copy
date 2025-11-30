@@ -4,9 +4,9 @@ import './LessonPage.css' // We can reuse the lesson styles
 
 const API_BASE_URL = import.meta.env.DEV ? '/api' : 'http://localhost:8000'
 
-function LessonsListPage() {
+// Receive language props
+function LessonsListPage({ language, setLanguage }) {
   const [lessons, setLessons] = useState([])
-  const [language, setLanguage] = useState('bn')
 
   useEffect(() => {
     fetch(`${API_BASE_URL}/lessons`)
