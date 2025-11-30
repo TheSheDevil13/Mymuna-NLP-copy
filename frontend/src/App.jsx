@@ -1,9 +1,16 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, useParams } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import ChatPage from './pages/ChatPage'
 import ObjectsPage from './pages/ObjectsPage'
 import LessonPage from './pages/LessonPage'
+import LessonsListPage from './pages/LessonsListPage'
 import './App.css'
+
+// Wrapper to extract ID from URL and pass to LessonPage
+function LessonPageWrapper() {
+  const { topicId } = useParams()
+  return <LessonPage topic={topicId} />
+}
 
 function App() {
   return (
@@ -14,8 +21,8 @@ function App() {
           <Routes>
             <Route path="/" element={<ChatPage />} />
             <Route path="/objects" element={<ObjectsPage />} />
-            <Route path="/lesson/liberation-war" element={<LessonPage topic="liberation-war" />} />
-            <Route path="/lesson/world-war-2" element={<LessonPage topic="world-war-2" />} />
+            <Route path="/lessons" element={<LessonsListPage />} />
+            <Route path="/lesson/:topicId" element={<LessonPageWrapper />} />
           </Routes>
         </div>
       </div>
