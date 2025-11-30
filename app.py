@@ -10,49 +10,34 @@ from GoogleTTS import runTTS
 import uvicorn
 import base64
 import re
+import json
+import os
+from pathlib import Path
 from typing import Optional
 
 app = FastAPI(title="Bangla Voice Chat API")
 
+# Define lessons directory
+LESSONS_DIR = Path(__file__).parent / "lessons"
 
 def strip_markdown(text):
-    """
-    Remove markdown formatting from text for TTS.
-    Keeps the text content but removes formatting characters.
-    """
-    if not text:
-        return text
-
-    # Remove bold/italic markers (**text**, *text*, __text__, _text_)
-    text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)  # **bold**
-    text = re.sub(r'\*([^*]+)\*', r'\1', text)      # *italic*
-    text = re.sub(r'__([^_]+)__', r'\1', text)       # __bold__
-    text = re.sub(r'_([^_]+)_', r'\1', text)         # _italic_
-
-    # Remove code blocks (```code``` and `code`)
-    text = re.sub(r'```[\s\S]*?```', '', text)       # ```code blocks```
-    text = re.sub(r'`([^`]+)`', r'\1', text)         # `inline code`
-
-    # Remove links but keep the text [text](url) -> text
+    """Remove markdown formatting from text for TTS."""
+    if not text: return text
+    text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
+    text = re.sub(r'\*([^*]+)\*', r'\1', text)
+    text = re.sub(r'__([^_]+)__', r'\1', text)
+    text = re.sub(r'_([^_]+)_', r'\1', text)
+    text = re.sub(r'```[\s\S]*?```', '', text)
+    text = re.sub(r'`([^`]+)`', r'\1', text)
     text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
-
-    # Remove headers (# Header -> Header)
     text = re.sub(r'^#{1,6}\s+(.+)$', r'\1', text, flags=re.MULTILINE)
-
-    # Remove list markers (- item, * item, 1. item)
     text = re.sub(r'^[\s]*[-*+]\s+', '', text, flags=re.MULTILINE)
     text = re.sub(r'^[\s]*\d+\.\s+', '', text, flags=re.MULTILINE)
-
-    # Remove horizontal rules (---, ***)
     text = re.sub(r'^[-*]{3,}$', '', text, flags=re.MULTILINE)
-
-    # Clean up extra whitespace
-    text = re.sub(r'\n\s*\n', '\n\n', text)  # Multiple newlines to double
+    text = re.sub(r'\n\s*\n', '\n\n', text)
     text = text.strip()
-
     return text
 
-# Enable CORS for frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -61,254 +46,104 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 @app.get("/")
 async def root():
-    """Health check endpoint."""
     return {"message": "Bangla Voice Chat API is running"}
 
+@app.get("/lessons")
+async def get_lessons():
+    """Scan the lessons directory and return available lessons."""
+    lessons_list = []
+    
+    if not LESSONS_DIR.exists():
+        return []
+
+    for folder in LESSONS_DIR.iterdir():
+        if folder.is_dir():
+            meta_path = folder / "metadata.json"
+            if meta_path.exists():
+                try:
+                    with open(meta_path, 'r', encoding='utf-8') as f:
+                        meta = json.load(f)
+                        lessons_list.append({
+                            "id": folder.name,
+                            "title_en": meta.get("title_en", folder.name),
+                            "title_bn": meta.get("title_bn", folder.name)
+                        })
+                except Exception as e:
+                    print(f"Error reading metadata for {folder.name}: {e}")
+    
+    return lessons_list
 
 @app.post("/chat/audio")
-async def chat_with_audio(
-    audio: UploadFile = File(...),
-    language_code: Optional[str] = Form('bn-BD')
-):
-    """
-    Process audio input, convert to text, get Gemini response, and return audio with text.
-
-    Args:
-        audio: Audio file (WAV format, 16kHz, mono, LINEAR16 or WebM)
-        language_code: Language code for STT and TTS (default: 'bn-BD' for Bangla)
-
-    Returns:
-        JSON with user_text, assistant_text, and audio_base64
-    """
+async def chat_with_audio(audio: UploadFile = File(...), language_code: Optional[str] = Form('bn-BD')):
     try:
-        # Read audio file
         audio_bytes = await audio.read()
+        if not audio_bytes: raise HTTPException(status_code=400, detail="No audio data")
 
-        if not audio_bytes:
-            raise HTTPException(status_code=400, detail="No audio data received")
+        # Detect format
+        audio_format = 'wav'
+        if audio.filename and audio.filename.split('.')[-1].lower() == 'webm':
+            audio_format = 'webm'
+        
+        encoding = speech.RecognitionConfig.AudioEncoding.WEBM_OPUS if audio_format == 'webm' else speech.RecognitionConfig.AudioEncoding.LINEAR16
+        sample_rate = None if audio_format == 'webm' else 16000
 
-        # Detect audio format from filename or content type
-        audio_format = None
-        if audio.filename:
-            audio_format = audio.filename.split('.')[-1].lower()
-        elif audio.content_type:
-            if 'webm' in audio.content_type:
-                audio_format = 'webm'
-            elif 'wav' in audio.content_type:
-                audio_format = 'wav'
+        user_text = runSTT_from_bytes(audio_bytes, rate=sample_rate, encoding=encoding, language_code=language_code)
+        if not user_text: raise HTTPException(status_code=400, detail="No speech detected")
 
-        # Determine encoding and sample rate for Google Cloud Speech-to-Text
-        encoding = speech.RecognitionConfig.AudioEncoding.ENCODING_UNSPECIFIED
-        sample_rate = None  # None means auto-detect
-
-        if audio_format == 'webm':
-            encoding = speech.RecognitionConfig.AudioEncoding.WEBM_OPUS
-            sample_rate = None
-            print("Detected WebM format, using WEBM_OPUS encoding")
-        elif audio_format == 'wav':
-            encoding = speech.RecognitionConfig.AudioEncoding.LINEAR16
-            sample_rate = 16000
-            print("Detected WAV format, using LINEAR16 encoding")
-        else:
-            print(f"Audio format: {audio_format or 'unknown'}, using auto-detection")
-
-        # Step 1: Convert audio to text using STT
-        print("Converting audio to text...")
-        try:
-            user_text = runSTT_from_bytes(audio_bytes, rate=sample_rate, encoding=encoding, language_code=language_code)
-        except Exception as e:
-            print(f"STT Error: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Speech-to-text failed: {str(e)}")
-
-        if not user_text:
-            raise HTTPException(status_code=400, detail="No speech detected in audio")
-
-        print(f"User said: {user_text}")
-
-        # Step 2: Get response from Gemini (chat mode)
-        print("Getting response from Gemini...")
-        try:
-            assistant_text = send_message(user_text, mode='chat', language_code=language_code)
-        except Exception as e:
-            print(f"Gemini Error: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Gemini API failed: {str(e)}")
-
-        if not assistant_text:
-            raise HTTPException(status_code=500, detail="No response from Gemini")
-
-        print(f"Assistant replied: {assistant_text}")
-
-        # Step 3: Strip markdown for both TTS and display
+        assistant_text = send_message(user_text, mode='chat', language_code=language_code)
         assistant_text_clean = strip_markdown(assistant_text)
-        print(f"Text (markdown stripped): {assistant_text_clean}")
-
-        # Step 4: Convert response to audio using TTS
-        print("Converting response to audio...")
-        try:
-            response_audio_bytes = runTTS(assistant_text_clean, return_bytes=True, language_code=language_code)
-        except Exception as e:
-            print(f"TTS Error: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Text-to-speech failed: {str(e)}")
-
-        # Step 5: Encode audio to base64 for JSON response
+        response_audio_bytes = runTTS(assistant_text_clean, return_bytes=True, language_code=language_code)
         audio_base64 = base64.b64encode(response_audio_bytes).decode('utf-8')
 
-        # Return JSON with text and audio
-        return JSONResponse(
-            content={
-                "user_text": user_text,
-                "assistant_text": assistant_text_clean,
-                "audio_base64": audio_base64
-            },
-            media_type="application/json"
-        )
-
-    except HTTPException:
-        raise
+        return JSONResponse(content={
+            "user_text": user_text,
+            "assistant_text": assistant_text_clean,
+            "audio_base64": audio_base64
+        })
     except Exception as e:
-        print(f"Unexpected error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
+        print(f"Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/objects/detect")
-async def detect_objects_with_audio(
-    audio: UploadFile = File(...),
-    image: UploadFile = File(...),
-    language_code: Optional[str] = Form('bn-BD')
-):
-    """
-    Process image and audio, send both to Gemini for educational response about objects.
-
-    Args:
-        audio: Audio file (WebM format)
-        image: Image file (JPEG/PNG)
-        language_code: Language code for STT and TTS (default: 'bn-BD' for Bangla)
-
-    Returns:
-        JSON with user_text, assistant_text, and audio_base64
-    """
+async def detect_objects_with_audio(audio: UploadFile = File(...), image: UploadFile = File(...), language_code: Optional[str] = Form('bn-BD')):
     try:
-        # Read image file
         image_bytes = await image.read()
-        if not image_bytes:
-            raise HTTPException(status_code=400, detail="No image data received")
-
-        # Read audio file
         audio_bytes = await audio.read()
-        if not audio_bytes:
-            raise HTTPException(status_code=400, detail="No audio data received")
+        
+        user_text = runSTT_from_bytes(audio_bytes, rate=None, encoding=speech.RecognitionConfig.AudioEncoding.WEBM_OPUS, language_code=language_code)
+        if not user_text: raise HTTPException(status_code=400, detail="No speech detected")
 
-        # Step 1: Convert audio to text using STT
-        print("Converting audio to text...")
-        encoding = speech.RecognitionConfig.AudioEncoding.WEBM_OPUS
-        try:
-            user_text = runSTT_from_bytes(audio_bytes, rate=None, encoding=encoding, language_code=language_code)
-        except Exception as e:
-            print(f"STT Error: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Speech-to-text failed: {str(e)}")
-
-        if not user_text:
-            raise HTTPException(status_code=400, detail="No speech detected in audio")
-
-        print(f"User said: {user_text}")
-
-        # Step 2: Send image + text to Gemini (object_detection mode with vision)
-        print("Sending image and text to Gemini for analysis...")
-        try:
-            assistant_text = send_message(
-                user_text,
-                mode='object_detection',
-                language_code=language_code,
-                image_bytes=image_bytes
-            )
-        except Exception as e:
-            print(f"Gemini Error: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Gemini API failed: {str(e)}")
-
-        if not assistant_text:
-            raise HTTPException(status_code=500, detail="No response from Gemini")
-
-        print(f"Assistant replied: {assistant_text}")
-
-        # Step 3: Strip markdown for both TTS and display
+        assistant_text = send_message(user_text, mode='object_detection', language_code=language_code, image_bytes=image_bytes)
         assistant_text_clean = strip_markdown(assistant_text)
-
-        # Step 4: Convert response to audio using TTS
-        print("Converting response to audio...")
-        try:
-            response_audio_bytes = runTTS(assistant_text_clean, return_bytes=True, language_code=language_code)
-        except Exception as e:
-            print(f"TTS Error: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Text-to-speech failed: {str(e)}")
-
-        # Step 5: Encode audio to base64 for JSON response
+        response_audio_bytes = runTTS(assistant_text_clean, return_bytes=True, language_code=language_code)
         audio_base64 = base64.b64encode(response_audio_bytes).decode('utf-8')
 
-        # Return JSON with all information
-        return JSONResponse(
-            content={
-                "user_text": user_text,
-                "assistant_text": assistant_text_clean,
-                "audio_base64": audio_base64
-            },
-            media_type="application/json"
-        )
-
-    except HTTPException:
-        raise
+        return JSONResponse(content={
+            "user_text": user_text,
+            "assistant_text": assistant_text_clean,
+            "audio_base64": audio_base64
+        })
     except Exception as e:
-        print(f"Unexpected error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
+        print(f"Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/chat/text")
 async def chat_with_text(text: str):
-    """
-    Process text input, get Gemini response, and return text.
-    Useful for testing or text-only clients.
-
-    Args:
-        text: User's text message
-
-    Returns:
-        JSON with assistant's text response
-    """
     try:
         assistant_text = send_message(text, mode='chat')
         return {"response": assistant_text}
-
     except Exception as e:
-        print(f"Error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/session/reset")
-async def reset_session(
-    mode: Optional[str] = Form('chat'),
-    language_code: Optional[str] = Form('bn-BD'),
-    topic: Optional[str] = Form(None)
-):
-    """
-    Reset the chat session for a given mode and language.
-
-    Args:
-        mode: 'chat', 'object_detection', or 'lesson_delivery'
-        language_code: Language code
-        topic: Topic for lesson_delivery mode
-
-    Returns:
-        Success message
-    """
+async def reset_session(mode: Optional[str] = Form('chat'), language_code: Optional[str] = Form('bn-BD'), topic: Optional[str] = Form(None)):
     try:
         reset_chat_session(mode=mode, language_code=language_code, topic=topic)
-        return {"message": f"Session reset successfully for {mode} mode"}
+        return {"message": "Session reset"}
     except Exception as e:
-        print(f"Error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to reset session: {str(e)}")
-
+        raise HTTPException(status_code=500, detail=str(e))
 
 class LessonStartRequest(BaseModel):
     topic: str
@@ -319,202 +154,94 @@ class LessonTextRequest(BaseModel):
     topic: str
     language_code: Optional[str] = 'bn-BD'
 
-
 @app.post("/lesson/start")
 async def start_lesson(request: LessonStartRequest):
-    """
-    Start a lesson on a specific topic.
-
-    Args:
-        request: JSON with 'topic' and 'language_code'
-            - topic: 'liberation-war' or 'world-war-2'
-            - language_code: Language code (default: 'bn-BD')
-
-    Returns:
-        JSON with assistant_text and audio_base64
-    """
     try:
-        topic = request.topic
+        topic_id = request.topic
         language_code = request.language_code
-        
-        if topic not in ['liberation-war', 'world-war-2']:
-            raise HTTPException(status_code=400, detail="Invalid topic. Must be 'liberation-war' or 'world-war-2'")
-        
-        # Get topic name for the initial message
-        topic_names = {
-            'liberation-war': {
-                'bn': 'বাংলাদেশের মুক্তিযুদ্ধ',
-                'en': 'Bangladesh Liberation War'
-            },
-            'world-war-2': {
-                'bn': 'দ্বিতীয় বিশ্বযুদ্ধ',
-                'en': 'World War 2'
-            }
-        }
-        
         lang_key = 'en' if language_code.startswith('en') else 'bn'
-        topic_name = topic_names[topic][lang_key]
         
-        # Create initial message
+        # 1. Read lesson content
+        lesson_folder = LESSONS_DIR / topic_id
+        content_path = lesson_folder / f"content_{lang_key}.txt"
+        if not content_path.exists():
+            content_path = lesson_folder / "content_en.txt" # Fallback
+            
+        lesson_context = ""
+        if content_path.exists():
+            with open(content_path, 'r', encoding='utf-8') as f:
+                lesson_context = f.read()
+
+        # 2. Get Topic Name
+        meta_path = lesson_folder / "metadata.json"
+        topic_name = topic_id
+        if meta_path.exists():
+            with open(meta_path, 'r', encoding='utf-8') as f:
+                meta = json.load(f)
+                topic_name = meta.get(f"title_{lang_key}", topic_id)
+
+        # 3. Create initial message
         if lang_key == 'bn':
             initial_message = f"আমি {topic_name} সম্পর্কে শিখতে চাই। দয়া করে পাঠ শুরু করুন।"
         else:
             initial_message = f"I want to learn about {topic_name}. Please start the lesson."
         
-        # Get response from Gemini
-        print(f"Starting lesson on {topic} in {language_code}...")
-        try:
-            assistant_text = send_message(
-                initial_message,
-                mode='lesson_delivery',
-                language_code=language_code,
-                topic=topic
-            )
-        except Exception as e:
-            print(f"Gemini Error: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Gemini API failed: {str(e)}")
+        # 4. Reset and Start Session with Context
+        reset_chat_session(mode='lesson_delivery', language_code=language_code, topic=topic_id)
         
-        if not assistant_text:
-            raise HTTPException(status_code=500, detail="No response from Gemini")
-        
-        print(f"Assistant replied: {assistant_text}")
-        
-        # Strip markdown for TTS
-        assistant_text_clean = strip_markdown(assistant_text)
-        
-        # Convert response to audio using TTS
-        print("Converting response to audio...")
-        try:
-            response_audio_bytes = runTTS(assistant_text_clean, return_bytes=True, language_code=language_code)
-        except Exception as e:
-            print(f"TTS Error: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Text-to-speech failed: {str(e)}")
-        
-        # Encode audio to base64
-        audio_base64 = base64.b64encode(response_audio_bytes).decode('utf-8')
-        
-        return JSONResponse(
-            content={
-                "assistant_text": assistant_text_clean,
-                "audio_base64": audio_base64
-            },
-            media_type="application/json"
+        assistant_text = send_message(
+            initial_message,
+            mode='lesson_delivery',
+            language_code=language_code,
+            topic=topic_id,
+            context=lesson_context
         )
         
-    except HTTPException:
-        raise
+        assistant_text_clean = strip_markdown(assistant_text)
+        response_audio_bytes = runTTS(assistant_text_clean, return_bytes=True, language_code=language_code)
+        audio_base64 = base64.b64encode(response_audio_bytes).decode('utf-8')
+        
+        return JSONResponse(content={
+            "assistant_text": assistant_text_clean,
+            "audio_base64": audio_base64
+        })
+        
     except Exception as e:
-        print(f"Unexpected error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
+        print(f"Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/lesson/audio")
-async def lesson_with_audio(
-    audio: UploadFile = File(...),
-    topic: Optional[str] = Form(...),
-    language_code: Optional[str] = Form('bn-BD')
-):
-    """
-    Process audio input during a lesson, convert to text, get Gemini response, and return audio with text.
-
-    Args:
-        audio: Audio file (WebM format)
-        topic: Lesson topic ('liberation-war' or 'world-war-2')
-        language_code: Language code (default: 'bn-BD')
-
-    Returns:
-        JSON with user_text, assistant_text, and audio_base64
-    """
+async def lesson_with_audio(audio: UploadFile = File(...), topic: Optional[str] = Form(...), language_code: Optional[str] = Form('bn-BD')):
     try:
-        if topic not in ['liberation-war', 'world-war-2']:
-            raise HTTPException(status_code=400, detail="Invalid topic. Must be 'liberation-war' or 'world-war-2'")
-        
-        # Read audio file
         audio_bytes = await audio.read()
+        user_text = runSTT_from_bytes(audio_bytes, rate=None, encoding=speech.RecognitionConfig.AudioEncoding.WEBM_OPUS, language_code=language_code)
         
-        if not audio_bytes:
-            raise HTTPException(status_code=400, detail="No audio data received")
+        if not user_text: raise HTTPException(status_code=400, detail="No speech detected")
         
-        # Step 1: Convert audio to text using STT
-        print("Converting audio to text...")
-        encoding = speech.RecognitionConfig.AudioEncoding.WEBM_OPUS
-        try:
-            user_text = runSTT_from_bytes(audio_bytes, rate=None, encoding=encoding, language_code=language_code)
-        except Exception as e:
-            print(f"STT Error: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Speech-to-text failed: {str(e)}")
-        
-        if not user_text:
-            raise HTTPException(status_code=400, detail="No speech detected in audio")
-        
-        print(f"User said: {user_text}")
-        
-        # Step 2: Get response from Gemini (lesson_delivery mode)
-        print("Getting response from Gemini...")
-        try:
-            assistant_text = send_message(
-                user_text,
-                mode='lesson_delivery',
-                language_code=language_code,
-                topic=topic
-            )
-        except Exception as e:
-            print(f"Gemini Error: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Gemini API failed: {str(e)}")
-        
-        if not assistant_text:
-            raise HTTPException(status_code=500, detail="No response from Gemini")
-        
-        print(f"Assistant replied: {assistant_text}")
-        
-        # Step 3: Strip markdown for TTS
-        assistant_text_clean = strip_markdown(assistant_text)
-        
-        # Step 4: Convert response to audio using TTS
-        print("Converting response to audio...")
-        try:
-            response_audio_bytes = runTTS(assistant_text_clean, return_bytes=True, language_code=language_code)
-        except Exception as e:
-            print(f"TTS Error: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Text-to-speech failed: {str(e)}")
-        
-        # Step 5: Encode audio to base64
-        audio_base64 = base64.b64encode(response_audio_bytes).decode('utf-8')
-        
-        return JSONResponse(
-            content={
-                "user_text": user_text,
-                "assistant_text": assistant_text_clean,
-                "audio_base64": audio_base64
-            },
-            media_type="application/json"
+        # Pass topic so Gemini finds the correct session with context
+        assistant_text = send_message(
+            user_text,
+            mode='lesson_delivery',
+            language_code=language_code,
+            topic=topic
         )
         
-    except HTTPException:
-        raise
+        assistant_text_clean = strip_markdown(assistant_text)
+        response_audio_bytes = runTTS(assistant_text_clean, return_bytes=True, language_code=language_code)
+        audio_base64 = base64.b64encode(response_audio_bytes).decode('utf-8')
+        
+        return JSONResponse(content={
+            "user_text": user_text,
+            "assistant_text": assistant_text_clean,
+            "audio_base64": audio_base64
+        })
     except Exception as e:
-        print(f"Unexpected error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
+        print(f"Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/lesson/text")
 async def lesson_with_text(request: LessonTextRequest):
-    """
-    Process text input during a lesson, get Gemini response, and return text with audio.
-
-    Args:
-        request: JSON with 'text', 'topic', and 'language_code'
-            - text: User's text message
-            - topic: Lesson topic ('liberation-war' or 'world-war-2')
-            - language_code: Language code (default: 'bn-BD')
-
-    Returns:
-        JSON with assistant's text response and audio_base64
-    """
     try:
-        if request.topic not in ['liberation-war', 'world-war-2']:
-            raise HTTPException(status_code=400, detail="Invalid topic. Must be 'liberation-war' or 'world-war-2'")
-        
         assistant_text = send_message(
             request.text,
             mode='lesson_delivery',
@@ -522,36 +249,17 @@ async def lesson_with_text(request: LessonTextRequest):
             topic=request.topic
         )
         
-        if not assistant_text:
-            raise HTTPException(status_code=500, detail="No response from Gemini")
-        
-        # Strip markdown for TTS
         assistant_text_clean = strip_markdown(assistant_text)
-        
-        # Convert response to audio using TTS
-        try:
-            response_audio_bytes = runTTS(assistant_text_clean, return_bytes=True, language_code=request.language_code)
-        except Exception as e:
-            print(f"TTS Error: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Text-to-speech failed: {str(e)}")
-        
-        # Encode audio to base64
+        response_audio_bytes = runTTS(assistant_text_clean, return_bytes=True, language_code=request.language_code)
         audio_base64 = base64.b64encode(response_audio_bytes).decode('utf-8')
         
-        return JSONResponse(
-            content={
-                "response": assistant_text_clean,
-                "audio_base64": audio_base64
-            },
-            media_type="application/json"
-        )
-        
-    except HTTPException:
-        raise
+        return JSONResponse(content={
+            "response": assistant_text_clean,
+            "audio_base64": audio_base64
+        })
     except Exception as e:
         print(f"Error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
