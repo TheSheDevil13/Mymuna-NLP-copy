@@ -15,6 +15,9 @@ function QuizPage({ language }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   
+  // NEW: State to track if quiz has started
+  const [quizStarted, setQuizStarted] = useState(false)
+  
   // Ref for managing audio playback
   const audioRef = useRef(null)
 
@@ -40,20 +43,19 @@ function QuizPage({ language }) {
     })
   }, [topicId])
 
-  // --- AUDIO LOGIC START ---
-  // Effect to play audio whenever the question index changes
+  // --- AUDIO LOGIC ---
   useEffect(() => {
-    let isMounted = true; // Flag to track if this effect is still active
+    let isMounted = true; 
 
     const playAudio = async () => {
-        if (questions.length === 0 || showResult) return;
+        // Only play if quiz has started and result is not shown
+        if (questions.length === 0 || showResult || !quizStarted) return;
 
         const q = questions[currentQ];
         const textToRead = language === 'bn' ? q.question_bn : q.question_en;
 
         if (!textToRead) return;
 
-        // Stop any currently playing audio immediately
         if (audioRef.current) {
             audioRef.current.pause();
             audioRef.current.currentTime = 0;
@@ -68,7 +70,7 @@ function QuizPage({ language }) {
             });
 
             if (!response.ok) throw new Error('TTS failed');
-            if (!isMounted) return; // If component unmounted/updated during fetch, stop here
+            if (!isMounted) return; 
 
             const data = await response.json();
             const audioBytes = Uint8Array.from(atob(data.audio_base64), c => c.charCodeAt(0));
@@ -78,7 +80,6 @@ function QuizPage({ language }) {
             const audio = new Audio(audioUrl);
             audioRef.current = audio;
             
-            // Only play if we are still mounted
             if (isMounted) {
                 audio.play().catch(e => console.error("Audio play failed", e));
                 audio.onended = () => {
@@ -92,16 +93,14 @@ function QuizPage({ language }) {
 
     playAudio();
     
-    // Cleanup function
     return () => {
-        isMounted = false; // Mark this run as invalid
+        isMounted = false; 
         if (audioRef.current) {
             audioRef.current.pause();
             audioRef.current.currentTime = 0;
         }
     };
-  }, [currentQ, questions, language, showResult]);
-  // --- AUDIO LOGIC END ---
+  }, [currentQ, questions, language, showResult, quizStarted]); // Added quizStarted dependency
 
   const handleOptionClick = (option) => {
     if (selectedOption) return;
@@ -118,7 +117,6 @@ function QuizPage({ language }) {
       setFeedback('incorrect');
     }
 
-    // Stop audio when user answers (optional, but good for UX)
     if (audioRef.current) {
         audioRef.current.pause();
     }
@@ -204,7 +202,35 @@ function QuizPage({ language }) {
             minHeight: '500px',
             background: 'white'
           }}>
-            {!showResult ? (
+            {!quizStarted ? (
+              // --- START SCREEN ---
+              <div style={{
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  height: '100%', 
+                  marginTop: '50px'
+              }}>
+                <div style={{fontSize: '6rem', marginBottom: '20px', animation: 'bounce 2s infinite'}}>🧩</div>
+                <h2 style={{color: '#333', marginBottom: '15px'}}>
+                    {language === 'bn' ? 'তুমি কি প্রস্তুত?' : 'Are you ready?'}
+                </h2>
+                <p style={{fontSize: '1.2rem', color: '#666', marginBottom: '40px', textAlign: 'center'}}>
+                    {language === 'bn' 
+                        ? `${questions.length}টি প্রশ্ন আছে। শুরু করতে নিচের বাটনে ক্লিক করো!` 
+                        : `There are ${questions.length} questions. Click the button below to start!`}
+                </p>
+                <button 
+                    onClick={() => setQuizStarted(true)}
+                    className="voice-button"
+                    style={{padding: '15px 50px', fontSize: '1.5rem'}}
+                >
+                    {language === 'bn' ? 'শুরু করুন' : 'Start Quiz'}
+                </button>
+              </div>
+            ) : !showResult ? (
+              // --- QUESTION SCREEN ---
               <>
                 <div style={{width: '100%', maxWidth: '600px', height: '8px', background: '#eee', borderRadius: '10px', marginBottom: '30px'}}>
                     <div style={{
@@ -292,6 +318,7 @@ function QuizPage({ language }) {
                 )}
               </>
             ) : (
+              // --- RESULT SCREEN ---
               <div style={{
                   textAlign: 'center', 
                   width: '100%', 
@@ -329,7 +356,7 @@ function QuizPage({ language }) {
                 
                 <div style={{display: 'flex', gap: '15px', flexWrap: 'wrap', justifyContent: 'center'}}>
                     <button 
-                        onClick={() => { setShowResult(false); setCurrentQ(0); setScore(0); setSelectedOption(null); setFeedback(null); }}
+                        onClick={() => { setShowResult(false); setCurrentQ(0); setScore(0); setSelectedOption(null); setFeedback(null); setQuizStarted(false); }}
                         className="voice-button" 
                         style={{minWidth: '200px', padding: '15px 30px', fontSize: '1.1rem'}}
                     >
