@@ -261,5 +261,25 @@ async def lesson_with_text(request: LessonTextRequest):
         print(f"Error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/lesson/quiz")
+async def get_lesson_quiz(request: LessonStartRequest):
+    try:
+        # Construct path to the quiz.json file
+        lesson_folder = LESSONS_DIR / request.topic
+        quiz_path = lesson_folder / "quiz.json"
+        
+        # Check if file exists
+        if not quiz_path.exists():
+            raise HTTPException(status_code=404, detail="Quiz not found for this topic")
+            
+        # Read and return the JSON directly
+        with open(quiz_path, 'r', encoding='utf-8') as f:
+            quiz_data = json.load(f)
+        return quiz_data
+        
+    except Exception as e:
+        print(f"Error reading quiz: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error reading quiz: {str(e)}")
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

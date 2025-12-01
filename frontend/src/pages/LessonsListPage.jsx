@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import './LessonPage.css' // We can reuse the lesson styles
+import './LessonPage.css' 
 
 const API_BASE_URL = import.meta.env.DEV ? '/api' : 'http://localhost:8000'
 
-// Receive language props
-function LessonsListPage({ language, setLanguage }) {
+// Added 'mode' prop with default value 'lesson'
+function LessonsListPage({ language, setLanguage, mode = 'lesson' }) {
   const [lessons, setLessons] = useState([])
 
   useEffect(() => {
@@ -15,13 +15,28 @@ function LessonsListPage({ language, setLanguage }) {
       .catch(err => console.error("Failed to load lessons", err))
   }, [])
 
+  // Helper to get title based on mode
+  const getPageTitle = () => {
+    if (mode === 'quiz') {
+      return language === 'bn' ? 'মজার কুইজ খেলুন' : 'Play Fun Quizzes'
+    }
+    return language === 'bn' ? 'পাঠ নির্বাচন করুন' : 'Select a Lesson'
+  }
+
+  const getPageSubtitle = () => {
+    if (mode === 'quiz') {
+      return language === 'bn' ? 'তোমার পছন্দের কুইজটি বেছে নাও' : 'Choose a quiz to play'
+    }
+    return language === 'bn' ? 'আপনার পছন্দের বিষয় বেছে নিন' : 'Choose your favorite topic'
+  }
+
   return (
     <div className="lesson-page">
       <div className="lesson-container">
         <div className="lesson-section">
-          <div className="lesson-header">
-            <h1>{language === 'bn' ? 'পাঠ নির্বাচন করুন' : 'Select a Lesson'}</h1>
-            <p>{language === 'bn' ? 'আপনার পছন্দের বিষয় বেছে নিন' : 'Choose your favorite topic'}</p>
+          <div className="lesson-header" style={mode === 'quiz' ? {background: 'linear-gradient(135deg, #FF9966 0%, #FF5E62 100%)'} : {}}>
+            <h1>{getPageTitle()}</h1>
+            <p>{getPageSubtitle()}</p>
             
             <div className="language-toggle">
               <span className={language === 'bn' ? 'active' : ''}>বাংলা</span>
@@ -41,7 +56,8 @@ function LessonsListPage({ language, setLanguage }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '20px' }}>
               {lessons.map(lesson => (
                 <Link 
-                  to={`/lesson/${lesson.id}`} 
+                  // Dynamically determine link destination based on mode
+                  to={mode === 'quiz' ? `/quiz/${lesson.id}` : `/lesson/${lesson.id}`} 
                   key={lesson.id}
                   style={{ textDecoration: 'none' }}
                 >
@@ -57,7 +73,8 @@ function LessonsListPage({ language, setLanguage }) {
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    textAlign: 'center'
+                    textAlign: 'center',
+                    border: mode === 'quiz' ? '2px solid #FF9966' : 'none'
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.transform = 'translateY(-5px)';
@@ -68,12 +85,14 @@ function LessonsListPage({ language, setLanguage }) {
                     e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.1)';
                   }}
                   >
-                    <span style={{ fontSize: '2.5rem', marginBottom: '15px' }}>📚</span>
+                    <span style={{ fontSize: '3rem', marginBottom: '15px' }}>
+                      {mode === 'quiz' ? '🧩' : '📚'}
+                    </span>
                     <h3 style={{ 
                       margin: 0, 
                       color: '#333', 
-                      fontSize: '1.2rem',
-                      fontWeight: '600'
+                      fontSize: '1.3rem',
+                      fontWeight: '700'
                     }}>
                       {language === 'bn' ? lesson.title_bn : lesson.title_en}
                     </h3>

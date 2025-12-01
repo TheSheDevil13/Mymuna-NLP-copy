@@ -35,6 +35,14 @@ function Sidebar() {
           <i className="bi bi-book"></i>
           <span>Lessons</span>
         </Nav.Link>
+        <Nav.Link
+          as={Link}
+          to="/quizzes"
+          className={location.pathname.startsWith('/quiz') ? 'active' : ''}
+        >
+          <i className="bi bi-puzzle"></i>
+          <span>Quizzes</span>
+        </Nav.Link>
       </Nav>
     </div>
   )
