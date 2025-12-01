@@ -15,12 +15,12 @@ function QuizPage({ language }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   
-  // State to track if quiz has started
   const [quizStarted, setQuizStarted] = useState(false)
   
-  // Refs
+  // Refs for managing audio and race conditions
   const audioRef = useRef(null)
   const timerRef = useRef(null)
+  const audioRequestId = useRef(0) // New ref to track active audio request
 
   // Fetch Questions
   useEffect(() => {
@@ -58,11 +58,14 @@ function QuizPage({ language }) {
     }
   }, [])
 
-  // --- AUDIO PLAYER HELPER ---
+  // --- ROBUST AUDIO PLAYER HELPER ---
   const playAudio = async (text) => {
     if (!text) return;
 
-    // Stop current audio
+    // 1. Generate a new ID for this request
+    const currentRequestId = ++audioRequestId.current;
+
+    // 2. Stop any currently playing audio immediately
     if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.currentTime = 0;
@@ -78,10 +81,18 @@ function QuizPage({ language }) {
 
         if (!response.ok) throw new Error('TTS failed');
 
+        // 3. CHECK FOR STALE REQUEST: 
+        // If the user clicked something else while we were fetching, 
+        // audioRequestId.current will be different. Stop here.
+        if (currentRequestId !== audioRequestId.current) return;
+
         const data = await response.json();
         const audioBytes = Uint8Array.from(atob(data.audio_base64), c => c.charCodeAt(0));
         const audioBlob = new Blob([audioBytes], { type: 'audio/wav' });
         const audioUrl = URL.createObjectURL(audioBlob);
+
+        // 4. Double check before playing (just in case)
+        if (currentRequestId !== audioRequestId.current) return;
 
         const audio = new Audio(audioUrl);
         audioRef.current = audio;
@@ -142,13 +153,13 @@ function QuizPage({ language }) {
 
     const runAudioSequence = async () => {
         if (showResult) {
-            // CASE 1: Result Screen - Play Recommendation
+            // CASE 1: Result Screen
             timeoutId = setTimeout(() => {
                 const rec = getRecommendation();
                 playAudio(rec.audioMsg);
             }, 500);
         } else {
-            // CASE 2: Question Screen - Play Question
+            // CASE 2: Question Screen
             const q = questions[currentQ];
             const textToRead = language === 'bn' ? q.question_bn : q.question_en;
             timeoutId = setTimeout(() => playAudio(textToRead), 500);
@@ -163,7 +174,7 @@ function QuizPage({ language }) {
 
   // --- HANDLE ANSWER ---
   const handleOptionClick = (option) => {
-    if (selectedOption) return; // Prevent multiple clicks
+    if (selectedOption) return; 
 
     setSelectedOption(option);
     
@@ -181,10 +192,9 @@ function QuizPage({ language }) {
       feedbackText = language === 'bn' ? "ভুল উত্তর।" : "That's incorrect.";
     }
 
-    // Play immediate feedback
+    // Play feedback (This increments requestId, effectively cancelling any pending question audio)
     playAudio(feedbackText);
 
-    // Wait and Go to Next
     timerRef.current = setTimeout(() => {
       if (currentQ + 1 < questions.length) {
         setCurrentQ(currentQ + 1);
@@ -320,36 +330,12 @@ function QuizPage({ language }) {
                           textAlign: 'center',
                           fontWeight: '500'
                         }}
-                        onMouseEnter={(e) => {
-                            if (!selectedOption) {
-                                e.currentTarget.style.background = '#e9ecef';
-                                e.currentTarget.style.transform = 'translateY(-2px)';
-                            }
-                        }}
-                        onMouseLeave={(e) => {
-                            if (!selectedOption) {
-                                e.currentTarget.style.background = '#f8f9fa';
-                                e.currentTarget.style.transform = 'translateY(0)';
-                            }
-                        }}
                       >
                         {opt}
                       </button>
                     )
                   })}
                 </div>
-                
-                {feedback && (
-                  <div style={{
-                      fontSize: '1.5rem', 
-                      marginTop: '30px', 
-                      fontWeight: 'bold',
-                      color: feedback === 'correct' ? '#28a745' : '#dc3545',
-                      animation: 'fadeIn 0.3s'
-                  }}>
-                    {/* Visual feedback only - audio handled separately */}
-                  </div>
-                )}
               </>
             ) : (
               // --- RESULT SCREEN ---
@@ -390,7 +376,6 @@ function QuizPage({ language }) {
                 
                 <div style={{display: 'flex', gap: '15px', flexWrap: 'wrap', justifyContent: 'center'}}>
                     
-                    {/* PRIMARY ACTION BASED ON SCORE */}
                     {rec.actionType === 'review' ? (
                         <Link to={`/lesson/${topicId}`} style={{textDecoration: 'none'}}>
                             <button 
@@ -411,7 +396,6 @@ function QuizPage({ language }) {
                         </Link>
                     )}
 
-                    {/* SECONDARY ACTION */}
                     <button 
                         onClick={() => { setShowResult(false); setCurrentQ(0); setScore(0); setSelectedOption(null); setFeedback(null); setQuizStarted(false); }}
                         className="voice-button" 
