@@ -17,12 +17,10 @@ function QuizPage({ language }) {
   
   const [quizStarted, setQuizStarted] = useState(false)
   
-  // Refs for managing audio and race conditions
   const audioRef = useRef(null)
   const timerRef = useRef(null)
-  const audioRequestId = useRef(0) // New ref to track active audio request
+  const audioRequestId = useRef(0)
 
-  // Fetch Questions
   useEffect(() => {
     setLoading(true)
     fetch(`${API_BASE_URL}/lesson/quiz`, {
@@ -45,7 +43,6 @@ function QuizPage({ language }) {
     })
   }, [topicId])
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (audioRef.current) {
@@ -58,14 +55,11 @@ function QuizPage({ language }) {
     }
   }, [])
 
-  // --- ROBUST AUDIO PLAYER HELPER ---
   const playAudio = async (text) => {
     if (!text) return;
 
-    // 1. Generate a new ID for this request
     const currentRequestId = ++audioRequestId.current;
 
-    // 2. Stop any currently playing audio immediately
     if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.currentTime = 0;
@@ -80,10 +74,6 @@ function QuizPage({ language }) {
         });
 
         if (!response.ok) throw new Error('TTS failed');
-
-        // 3. CHECK FOR STALE REQUEST: 
-        // If the user clicked something else while we were fetching, 
-        // audioRequestId.current will be different. Stop here.
         if (currentRequestId !== audioRequestId.current) return;
 
         const data = await response.json();
@@ -91,7 +81,6 @@ function QuizPage({ language }) {
         const audioBlob = new Blob([audioBytes], { type: 'audio/wav' });
         const audioUrl = URL.createObjectURL(audioBlob);
 
-        // 4. Double check before playing (just in case)
         if (currentRequestId !== audioRequestId.current) return;
 
         const audio = new Audio(audioUrl);
@@ -105,7 +94,6 @@ function QuizPage({ language }) {
     }
   }
 
-  // --- RECOMMENDATION LOGIC ---
   const getRecommendation = () => {
     const percentage = (score / questions.length) * 100
     
@@ -145,7 +133,6 @@ function QuizPage({ language }) {
     };
   }
 
-  // --- EFFECT: MANAGE AUDIO FLOW ---
   useEffect(() => {
     if (!quizStarted || questions.length === 0) return;
 
@@ -153,13 +140,11 @@ function QuizPage({ language }) {
 
     const runAudioSequence = async () => {
         if (showResult) {
-            // CASE 1: Result Screen
             timeoutId = setTimeout(() => {
                 const rec = getRecommendation();
                 playAudio(rec.audioMsg);
             }, 500);
         } else {
-            // CASE 2: Question Screen
             const q = questions[currentQ];
             const textToRead = language === 'bn' ? q.question_bn : q.question_en;
             timeoutId = setTimeout(() => playAudio(textToRead), 500);
@@ -171,8 +156,6 @@ function QuizPage({ language }) {
     return () => clearTimeout(timeoutId);
   }, [currentQ, quizStarted, showResult, questions, language]);
 
-
-  // --- HANDLE ANSWER ---
   const handleOptionClick = (option) => {
     if (selectedOption) return; 
 
@@ -192,7 +175,6 @@ function QuizPage({ language }) {
       feedbackText = language === 'bn' ? "ভুল উত্তর।" : "That's incorrect.";
     }
 
-    // Play feedback (This increments requestId, effectively cancelling any pending question audio)
     playAudio(feedbackText);
 
     timerRef.current = setTimeout(() => {
@@ -239,28 +221,15 @@ function QuizPage({ language }) {
             <p>{topicId.replace('_', ' ').toUpperCase()}</p>
           </div>
 
-          <div className="lesson-view" style={{
-            flexDirection: 'column', 
-            padding: '30px', 
-            justifyContent: 'flex-start',
-            minHeight: '500px',
-            background: 'white'
-          }}>
+          <div className="lesson-view">
             {!quizStarted ? (
-              // --- START SCREEN ---
-              <div style={{
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  height: '100%', 
-                  marginTop: '50px'
-              }}>
-                <div style={{fontSize: '6rem', marginBottom: '20px', animation: 'bounce 2s infinite'}}>🧩</div>
+              // START SCREEN
+              <div className="quiz-start-screen">
+                <div className="quiz-icon">🧩</div>
                 <h2 style={{color: '#333', marginBottom: '15px'}}>
                     {language === 'bn' ? 'তুমি কি প্রস্তুত?' : 'Are you ready?'}
                 </h2>
-                <p style={{fontSize: '1.2rem', color: '#666', marginBottom: '40px', textAlign: 'center'}}>
+                <p style={{fontSize: '1.2rem', color: '#666', marginBottom: '40px'}}>
                     {language === 'bn' 
                         ? `${questions.length}টি প্রশ্ন আছে। শুরু করতে নিচের বাটনে ক্লিক করো!` 
                         : `There are ${questions.length} questions. Click the button below to start!`}
@@ -268,15 +237,15 @@ function QuizPage({ language }) {
                 <button 
                     onClick={() => setQuizStarted(true)}
                     className="voice-button"
-                    style={{padding: '15px 50px', fontSize: '1.5rem'}}
+                    style={{maxWidth: '250px'}}
                 >
                     {language === 'bn' ? 'শুরু করুন' : 'Start Quiz'}
                 </button>
               </div>
             ) : !showResult ? (
-              // --- QUESTION SCREEN ---
-              <>
-                <div style={{width: '100%', maxWidth: '600px', height: '8px', background: '#eee', borderRadius: '10px', marginBottom: '30px'}}>
+              // QUESTION SCREEN
+              <div className="quiz-content">
+                <div style={{width: '100%', height: '8px', background: '#eee', borderRadius: '10px', marginBottom: '30px'}}>
                     <div style={{
                         width: `${((currentQ + 1) / questions.length) * 100}%`,
                         height: '100%',
@@ -297,7 +266,7 @@ function QuizPage({ language }) {
                   {currentQ + 1}. {questionText}
                 </div>
 
-                <div style={{display: 'grid', gap: '15px', width: '100%', maxWidth: '600px'}}>
+                <div className="quiz-options-grid">
                   {options.map((opt, idx) => {
                     let borderColor = '#e0e0e0';
                     let bgColor = 'white';
@@ -317,18 +286,11 @@ function QuizPage({ language }) {
                       <button 
                         key={idx}
                         onClick={() => handleOptionClick(opt)}
+                        className="quiz-option-btn"
                         style={{
-                          padding: '18px 25px',
-                          fontSize: '1.2rem',
-                          borderRadius: '50px', 
                           border: `2px solid ${selectedOption ? borderColor : 'transparent'}`, 
-                          background: selectedOption && (selectedOption === opt || opt === correctAns) ? bgColor : '#f8f9fa', 
+                          background: selectedOption && (selectedOption === opt || opt === correctAns) ? bgColor : '#fff', 
                           color: textColor,
-                          cursor: selectedOption ? 'default' : 'pointer',
-                          transition: 'all 0.2s',
-                          boxShadow: selectedOption === opt ? 'none' : '0 2px 5px rgba(0,0,0,0.05)',
-                          textAlign: 'center',
-                          fontWeight: '500'
                         }}
                       >
                         {opt}
@@ -336,13 +298,22 @@ function QuizPage({ language }) {
                     )
                   })}
                 </div>
-              </>
+                
+                {feedback && (
+                  <div style={{
+                      fontSize: '1.5rem', 
+                      marginTop: '30px', 
+                      fontWeight: 'bold',
+                      color: feedback === 'correct' ? '#28a745' : '#dc3545',
+                      animation: 'fadeIn 0.3s'
+                  }}></div>
+                )}
+              </div>
             ) : (
-              // --- RESULT SCREEN ---
+              // RESULT SCREEN
               <div style={{
                   textAlign: 'center', 
                   width: '100%', 
-                  height: '100%', 
                   display: 'flex', 
                   flexDirection: 'column', 
                   alignItems: 'center', 
@@ -377,20 +348,14 @@ function QuizPage({ language }) {
                 <div style={{display: 'flex', gap: '15px', flexWrap: 'wrap', justifyContent: 'center'}}>
                     
                     {rec.actionType === 'review' ? (
-                        <Link to={`/lesson/${topicId}`} style={{textDecoration: 'none'}}>
-                            <button 
-                                className="voice-button" 
-                                style={{minWidth: '220px', padding: '15px 30px', fontSize: '1.1rem'}}
-                            >
+                        <Link to={`/lesson/${topicId}`} style={{textDecoration: 'none', width: '100%', maxWidth: '300px'}}>
+                            <button className="voice-button" style={{width: '100%'}}>
                             📖 {language === 'bn' ? 'পাঠটি পড়ো' : 'Read Lesson'}
                             </button>
                         </Link>
                     ) : (
-                        <Link to="/quizzes" style={{textDecoration: 'none'}}>
-                            <button 
-                                className="voice-button" 
-                                style={{minWidth: '220px', padding: '15px 30px', fontSize: '1.1rem'}}
-                            >
+                        <Link to="/quizzes" style={{textDecoration: 'none', width: '100%', maxWidth: '300px'}}>
+                            <button className="voice-button" style={{width: '100%'}}>
                             🧩 {language === 'bn' ? 'অন্য কুইজ' : 'Other Quizzes'}
                             </button>
                         </Link>
@@ -400,9 +365,7 @@ function QuizPage({ language }) {
                         onClick={() => { setShowResult(false); setCurrentQ(0); setScore(0); setSelectedOption(null); setFeedback(null); setQuizStarted(false); }}
                         className="voice-button" 
                         style={{
-                            minWidth: '200px', 
-                            padding: '15px 30px', 
-                            fontSize: '1.1rem',
+                            maxWidth: '300px',
                             background: 'white',
                             color: '#667eea',
                             border: '2px solid #667eea'
