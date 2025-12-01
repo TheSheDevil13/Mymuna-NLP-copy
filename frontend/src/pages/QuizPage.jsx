@@ -15,7 +15,7 @@ function QuizPage({ language }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   
-  // NEW: State to track if quiz has started
+  // State to track if quiz has started
   const [quizStarted, setQuizStarted] = useState(false)
   
   // Ref for managing audio playback
@@ -100,7 +100,7 @@ function QuizPage({ language }) {
             audioRef.current.currentTime = 0;
         }
     };
-  }, [currentQ, questions, language, showResult, quizStarted]); // Added quizStarted dependency
+  }, [currentQ, questions, language, showResult, quizStarted]);
 
   const handleOptionClick = (option) => {
     if (selectedOption) return;
@@ -305,17 +305,8 @@ function QuizPage({ language }) {
                   })}
                 </div>
                 
-                {feedback && (
-                  <div style={{
-                      fontSize: '1.5rem', 
-                      marginTop: '30px', 
-                      fontWeight: 'bold',
-                      color: feedback === 'correct' ? '#28a745' : '#dc3545',
-                      animation: 'fadeIn 0.3s'
-                  }}>
-                    {feedback === 'correct' ? (language === 'bn' ? '✅ সঠিক!' : '✅ Correct!') : (language === 'bn' ? '❌ ভুল!' : '❌ Incorrect')}
-                  </div>
-                )}
+                {/* Feedback Text Removed Here */}
+                
               </>
             ) : (
               // --- RESULT SCREEN ---
