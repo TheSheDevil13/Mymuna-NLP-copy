@@ -1,0 +1,42 @@
+[
+  {
+    "question_en": "What is at the very center of our Solar System?",
+    "question_bn": "সৌরজগতের ঠিক মাঝখানে কী আছে?",
+    "options_en": ["Earth", "The Sun", "The Moon", "Mars"],
+    "options_bn": ["পৃথিবী", "সূর্য", "চাঁদ", "মঙ্গল"],
+    "correct_answer_en": "The Sun",
+    "correct_answer_bn": "সূর্য"
+  },
+  {
+    "question_en": "How many main planets are there in the Solar System?",
+    "question_bn": "সৌরজগতে মোট কয়টি প্রধান গ্রহ আছে?",
+    "options_en": ["5", "8", "10", "12"],
+    "options_bn": ["৫টি", "৮টি", "১০টি", "১২টি"],
+    "correct_answer_en": "8",
+    "correct_answer_bn": "৮টি"
+  },
+  {
+    "question_en": "Which planet is famous for its beautiful rings?",
+    "question_bn": "কোন গ্রহটি তার সুন্দর বলয়ের জন্য পরিচিত?",
+    "options_en": ["Jupiter", "Venus", "Saturn", "Mercury"],
+    "options_bn": ["বৃহস্পতি", "শুক্র", "শনি", "বুধ"],
+    "correct_answer_en": "Saturn",
+    "correct_answer_bn": "শনি"
+  },
+  {
+    "question_en": "Which planet is the largest?",
+    "question_bn": "সবচেয়ে বড় গ্রহ কোনটি?",
+    "options_en": ["Earth", "Mars", "Jupiter", "Neptune"],
+    "options_bn": ["পৃথিবী", "মঙ্গল", "বৃহস্পতি", "নেপচুন"],
+    "correct_answer_en": "Jupiter",
+    "correct_answer_bn": "বৃহস্পতি"
+  },
+  {
+    "question_en": "What is our home planet called?",
+    "question_bn": "আমাদের গ্রহের নাম কী?",
+    "options_en": ["Venus", "Earth", "Saturn", "Pluto"],
+    "options_bn": ["শুক্র", "পৃথিবী", "শনি", "প্লুটো"],
+    "correct_answer_en": "Earth",
+    "correct_answer_bn": "পৃথিবী"
+  }
+]

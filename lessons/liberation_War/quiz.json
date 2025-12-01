@@ -1,0 +1,42 @@
+[
+  {
+    "question_en": "When do we celebrate Victory Day?",
+    "question_bn": "আমরা কবে বিজয় দিবস পালন করি?",
+    "options_en": ["March 26", "December 16", "February 21", "April 14"],
+    "options_bn": ["২৬শে মার্চ", "১৬ই ডিসেম্বর", "২১শে ফেব্রুয়ারি", "১৪ই এপ্রিল"],
+    "correct_answer_en": "December 16",
+    "correct_answer_bn": "১৬ই ডিসেম্বর"
+  },
+  {
+    "question_en": "Who declared the independence of Bangladesh?",
+    "question_bn": "কে বাংলাদেশের স্বাধীনতা ঘোষণা করেন?",
+    "options_en": ["Tajuddin Ahmad", "Bangabandhu Sheikh Mujibur Rahman", "Ziaur Rahman", "Maulana Bhashani"],
+    "options_bn": ["তাজউদ্দীন আহমদ", "বঙ্গবন্ধু শেখ মুজিবুর রহমান", "জিয়াউর রহমান", "মওলানা ভাসানী"],
+    "correct_answer_en": "Bangabandhu Sheikh Mujibur Rahman",
+    "correct_answer_bn": "বঙ্গবন্ধু শেখ মুজিবুর রহমান"
+  },
+  {
+    "question_en": "What were the brave freedom fighters called?",
+    "question_bn": "সাহসী মুক্তিযোদ্ধারা কী নামে পরিচিত ছিলেন?",
+    "options_en": ["Mukti Bahini", "Shanti Bahini", "Rokki Bahini", "Razakars"],
+    "options_bn": ["মুক্তি বাহিনী", "শান্তি বাহিনী", "রক্ষী বাহিনী", "রাজাকার"],
+    "correct_answer_en": "Mukti Bahini",
+    "correct_answer_bn": "মুক্তি বাহিনী"
+  },
+  {
+    "question_en": "How long did the Liberation War last?",
+    "question_bn": "মুক্তিযুদ্ধ কত দিন ধরে চলেছিল?",
+    "options_en": ["5 months", "6 months", "9 months", "1 year"],
+    "options_bn": ["৫ মাস", "৬ মাস", "৯ মাস", "১ বছর"],
+    "correct_answer_en": "9 months",
+    "correct_answer_bn": "৯ মাস"
+  },
+  {
+    "question_en": "What was Bangladesh known as before 1971?",
+    "question_bn": "১৯৭১ সালের আগে বাংলাদেশের নাম কী ছিল?",
+    "options_en": ["West Pakistan", "East Pakistan", "Bengal", "India"],
+    "options_bn": ["পশ্চিম পাকিস্তান", "পূর্ব পাকিস্তান", "বাংলা", "ভারত"],
+    "correct_answer_en": "East Pakistan",
+    "correct_answer_bn": "পূর্ব পাকিস্তান"
+  }
+]
