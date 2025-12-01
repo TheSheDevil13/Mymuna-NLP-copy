@@ -6,13 +6,13 @@
 }
 
 .main-content {
-  margin-left: 250px;
-  width: calc(100% - 250px);
+  margin-left: 200px; /* Match new sidebar width */
+  width: calc(100% - 200px); /* Adjust width calculation */
   height: 100vh;
   display: flex;
   flex-direction: column;
   transition: all 0.3s ease;
-  overflow: hidden; /* Fix double scrollbars */
+  overflow: hidden;
 }
 
 /* Tablet & Mobile Breakpoint */

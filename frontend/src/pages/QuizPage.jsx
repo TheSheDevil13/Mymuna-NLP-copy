@@ -234,13 +234,14 @@ function QuizPage({ language }) {
                         ? `${questions.length}টি প্রশ্ন আছে। শুরু করতে নিচের বাটনে ক্লিক করো!` 
                         : `There are ${questions.length} questions. Click the button below to start!`}
                 </p>
-                <button 
-                    onClick={() => setQuizStarted(true)}
-                    className="voice-button"
-                    style={{maxWidth: '250px'}}
-                >
-                    {language === 'bn' ? 'শুরু করুন' : 'Start Quiz'}
-                </button>
+                <div className="voice-controls" style={{borderTop: 'none', background: 'transparent'}}>
+                    <button 
+                        onClick={() => setQuizStarted(true)}
+                        className="voice-button"
+                    >
+                        {language === 'bn' ? 'শুরু করুন' : 'Start Quiz'}
+                    </button>
+                </div>
               </div>
             ) : !showResult ? (
               // QUESTION SCREEN
@@ -345,19 +346,16 @@ function QuizPage({ language }) {
                   </p>
                 </div>
                 
-                <div style={{display: 'flex', gap: '15px', flexWrap: 'wrap', justifyContent: 'center'}}>
+                {/* FIXED: Use voice-controls class for side-by-side buttons on mobile */}
+                <div className="voice-controls" style={{borderTop: 'none', background: 'transparent', padding: 0}}>
                     
                     {rec.actionType === 'review' ? (
-                        <Link to={`/lesson/${topicId}`} style={{textDecoration: 'none', width: '100%', maxWidth: '300px'}}>
-                            <button className="voice-button" style={{width: '100%'}}>
+                        <Link to={`/lesson/${topicId}`} className="voice-button" style={{flex: 1}}>
                             📖 {language === 'bn' ? 'পাঠটি পড়ো' : 'Read Lesson'}
-                            </button>
                         </Link>
                     ) : (
-                        <Link to="/quizzes" style={{textDecoration: 'none', width: '100%', maxWidth: '300px'}}>
-                            <button className="voice-button" style={{width: '100%'}}>
+                        <Link to="/quizzes" className="voice-button" style={{flex: 1}}>
                             🧩 {language === 'bn' ? 'অন্য কুইজ' : 'Other Quizzes'}
-                            </button>
                         </Link>
                     )}
 
@@ -365,10 +363,10 @@ function QuizPage({ language }) {
                         onClick={() => { setShowResult(false); setCurrentQ(0); setScore(0); setSelectedOption(null); setFeedback(null); setQuizStarted(false); }}
                         className="voice-button" 
                         style={{
-                            maxWidth: '300px',
                             background: 'white',
                             color: '#667eea',
-                            border: '2px solid #667eea'
+                            border: '2px solid #667eea',
+                            flex: 1
                         }}
                     >
                     🔄 {language === 'bn' ? 'আবার খেলো' : 'Play Again'}

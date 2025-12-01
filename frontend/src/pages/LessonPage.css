@@ -1,3 +1,4 @@
+/* ... Existing Lesson Styles ... */
 .lesson-page {
   display: flex;
   align-items: center;
@@ -30,7 +31,7 @@
 .lesson-header {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
-  padding: 20px 30px;
+  padding: 20px; /* Reduced header padding */
   text-align: center;
   flex-shrink: 0;
 }
@@ -38,7 +39,7 @@
 .lesson-header h1 { font-size: 2rem; margin-bottom: 5px; font-weight: 600; }
 .lesson-header p { font-size: 1rem; opacity: 0.9; margin-bottom: 15px; }
 
-/* Toggle/Switch styles */
+/* ... Toggles ... */
 .language-toggle { display: flex; align-items: center; justify-content: center; gap: 12px; }
 .language-toggle span { font-size: 0.9rem; opacity: 0.7; transition: opacity 0.3s; }
 .language-toggle span.active { opacity: 1; font-weight: 600; }
@@ -59,104 +60,55 @@ input:checked + .slider:before { transform: translateX(24px); }
   overflow-y: auto;
 }
 
-/* --- QUIZ SPECIFIC STYLES --- */
-.quiz-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start; /* Changed from center to prevent cutting off top */
-  width: 100%;
-  max-width: 800px;
-  margin: 0 auto;
-}
-
-.quiz-start-screen {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: 20px;
-  min-height: 300px;
-}
-
-.quiz-icon {
-  font-size: 5rem;
-  margin-bottom: 20px;
-  animation: bounce 2s infinite;
-}
-
-.quiz-question-text {
-  fontSize: 1.8rem;
-  fontWeight: bold;
-  margin-bottom: 30px;
-  text-align: center;
-  color: #2d3436;
-  line-height: 1.4;
-}
-
-.quiz-options-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr; /* 2 columns on desktop */
-  gap: 15px;
-  width: 100%;
-}
-
-.quiz-option-btn {
-  padding: 15px;
-  font-size: 1.2rem;
-  border-radius: 15px;
-  cursor: pointer;
-  transition: all 0.2s;
-  text-align: center;
-  min-height: 80px; /* Ensure clickable area */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-}
-
-.quiz-option-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 12px rgba(0,0,0,0.1);
-}
-
-/* --- END QUIZ STYLES --- */
+/* ... Quiz Styles (Keep existing) ... */
+.quiz-content { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; width: 100%; max-width: 800px; margin: 0 auto; }
+.quiz-start-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; min-height: 300px; }
+.quiz-icon { font-size: 5rem; margin-bottom: 20px; animation: bounce 2s infinite; }
+.quiz-question-text { font-size: 1.8rem; font-weight: bold; margin-bottom: 30px; text-align: center; color: #2d3436; line-height: 1.4; }
+.quiz-options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; width: 100%; }
+.quiz-option-btn { padding: 15px; font-size: 1.2rem; border-radius: 15px; cursor: pointer; transition: all 0.2s; text-align: center; min-height: 80px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+.quiz-option-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 12px rgba(0,0,0,0.1); }
 
 .lesson-placeholder { text-align: center; color: #666; }
 .lesson-placeholder p:first-child { font-size: 4rem; margin-bottom: 20px; }
-.error-message { margin: 20px; padding: 15px; background: #fee; color: #c33; border-radius: 10px; border-left: 4px solid #c33; text-align: center; }
+.error-message { margin: 20px 30px; padding: 15px; background: #fee; color: #c33; border-radius: 10px; border-left: 4px solid #c33; text-align: center; }
 
+/* --- COMPACT VOICE CONTROLS --- */
 .voice-controls {
-  padding: 20px;
+  padding: 12px 15px; /* Compact padding to save space */
   display: flex;
   justify-content: center;
+  align-items: center;
+  gap: 12px;
   background: white;
   flex-shrink: 0;
   border-top: 1px solid #eee;
+  width: 100%;
 }
 
 .voice-button {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
-  padding: 15px 30px;
-  font-size: 1.1rem;
+  padding: 12px 25px;
+  font-size: 1.05rem;
   border-radius: 50px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
   transition: transform 0.2s, box-shadow 0.2s;
-  min-width: 200px;
+  min-width: 180px; /* Default width for desktop */
   font-weight: 500;
+  text-decoration: none;
 }
 
-/* Hover, Pulse, Spinner */
 .voice-button:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4); }
 .voice-button.recording { background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); animation: pulse 2s infinite; }
 .voice-button.disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* ... Animations ... */
 @keyframes pulse-animation { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.2); opacity: 0.7; } }
 @keyframes bounce { 0%, 20%, 50%, 80%, 100% {transform: translateY(0);} 40% {transform: translateY(-20px);} 60% {transform: translateY(-10px);} }
 .pulse { width: 12px; height: 12px; background: white; border-radius: 50%; animation: pulse-animation 1.5s infinite; }
@@ -164,26 +116,30 @@ input:checked + .slider:before { transform: translateX(24px); }
 @keyframes spin { to { transform: rotate(360deg); } }
 .mic-icon { font-size: 1.3rem; }
 
-/* Responsive design */
+/* --- RESPONSIVE DESIGN --- */
 @media (max-width: 768px) {
   .lesson-page {
     padding: 10px;
     align-items: flex-start;
   }
 
-  .lesson-header h1 { font-size: 1.5rem; }
-  .lesson-header p { font-size: 0.9rem; }
-  
-  .quiz-options-grid {
-    grid-template-columns: 1fr; /* Single column for options */
+  .lesson-header { padding: 15px; }
+  .lesson-header h1 { font-size: 1.5rem; margin-bottom: 5px; }
+  .lesson-header p { font-size: 0.9rem; margin-bottom: 10px; }
+
+  /* FIX: Ensure buttons stay side-by-side on mobile */
+  .voice-controls {
+    flex-direction: row; 
+    gap: 8px;
+    padding: 10px;
   }
-  
-  .quiz-question-text {
-    font-size: 1.4rem;
-  }
-  
+
   .voice-button {
-    width: 100%;
-    min-width: unset;
+    min-width: 0; /* Allow shrinking */
+    width: auto;
+    flex: 1; /* Force equal width for both buttons */
+    padding: 12px 5px; /* Reduce padding to fit text */
+    font-size: 0.9rem;
+    white-space: nowrap;
   }
 }

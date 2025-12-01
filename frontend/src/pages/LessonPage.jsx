@@ -9,10 +9,9 @@ function LessonPage({ topic, language, setLanguage }) {
   const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState(null)
   
-  // Lesson States
   const [lessonStarted, setLessonStarted] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
-  const [isPaused, setIsPaused] = useState(false) // True = Interrupted (Resume), False = Finished (Next)
+  const [isPaused, setIsPaused] = useState(false) 
   
   const [currentLessonText, setCurrentLessonText] = useState('')
   const [lessonTitles, setLessonTitles] = useState(null)
@@ -60,7 +59,6 @@ function LessonPage({ topic, language, setLanguage }) {
     }
   }, [])
 
-  // --- Auto-Scroll Logic ---
   const startAutoScroll = (audioElement) => {
     const container = textContainerRef.current
     if (!container || !audioElement) return
@@ -83,14 +81,13 @@ function LessonPage({ topic, language, setLanguage }) {
     scrollAnimationRef.current = requestAnimationFrame(animate)
   }
 
-  // --- Audio Handlers ---
   const stopAudioPlayback = () => {
     if (responseAudioRef.current) {
       responseAudioRef.current.pause()
     }
     cancelAnimationFrame(scrollAnimationRef.current)
     setIsPlaying(false)
-    setIsPaused(true) // Mark as Paused (Interrupted)
+    setIsPaused(true) 
   }
 
   const playResponseAudio = (audio_base64) => {
@@ -111,13 +108,13 @@ function LessonPage({ topic, language, setLanguage }) {
     
     audio.onpause = () => {
       setIsPlaying(false)
-      setIsPaused(true) // User paused it
+      setIsPaused(true) 
       cancelAnimationFrame(scrollAnimationRef.current)
     }
 
     audio.onended = () => {
       setIsPlaying(false)
-      setIsPaused(false) // Finished naturally (Ready for Next Part)
+      setIsPaused(false) 
       cancelAnimationFrame(scrollAnimationRef.current)
       URL.revokeObjectURL(audioUrl)
     }
@@ -136,10 +133,7 @@ function LessonPage({ topic, language, setLanguage }) {
     }
   }
 
-  // --- API Calls ---
-
   const continueLesson = () => {
-    // Send "Continue" text to backend to trigger next segment
     const text = language === 'bn' ? 'হ্যাঁ, দয়া করে চালিয়ে যান।' : 'Yes, please continue.'
     sendTextToBackend(text)
   }
@@ -213,19 +207,16 @@ function LessonPage({ topic, language, setLanguage }) {
   }
 
   const handleResponse = (data) => {
-    // Handle text update
     const text = data.assistant_text || data.response
     if (text) {
       setCurrentLessonText(text)
       if (textContainerRef.current) textContainerRef.current.scrollTop = 0
     }
-    // Handle audio update
     if (data.audio_base64) {
       playResponseAudio(data.audio_base64)
     }
   }
 
-  // --- Recorder Controls ---
   const startRecording = async () => {
     try {
       setError(null)
@@ -276,7 +267,7 @@ function LessonPage({ topic, language, setLanguage }) {
 
           <div className="lesson-view" style={{ 
             display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
-            padding: '30px', overflow: 'hidden' 
+            padding: '20px', overflow: 'hidden' 
           }}>
             {!lessonStarted ? (
               <div className="lesson-placeholder">
@@ -284,14 +275,14 @@ function LessonPage({ topic, language, setLanguage }) {
                 <p>{language === 'bn' ? 'পাঠ শুরু করতে নিচের বাটনটি চাপুন' : 'Click start to begin the lesson'}</p>
               </div>
             ) : (
-              <div className="lesson-content" style={{ width: '100%', maxWidth: '800px', height: '350px', display: 'flex', flexDirection: 'column' }}>
+              <div className="lesson-content" style={{ width: '100%', maxWidth: '800px', height: '100%', display: 'flex', flexDirection: 'column' }}>
                 <div 
                   ref={textContainerRef}
                   style={{
                     background: 'white', padding: '30px 40px', borderRadius: '20px',
                     boxShadow: '0 10px 30px rgba(0,0,0,0.08)', fontSize: '1.6rem', fontWeight: '600',
                     lineHeight: '1.8', color: '#2d3436', height: '100%', overflowY: 'auto',
-                    scrollBehavior: 'auto', whiteSpace: 'pre-wrap', marginBottom: '20px',
+                    scrollBehavior: 'auto', whiteSpace: 'pre-wrap', marginBottom: '15px',
                     border: '2px solid rgba(102, 126, 234, 0.1)'
                   }}
                 >
@@ -320,9 +311,9 @@ function LessonPage({ topic, language, setLanguage }) {
 
           {error && <div className="error-message">{error}</div>}
 
-          <div className="voice-controls" style={{ flexDirection: 'column', gap: '15px' }}>
+          {/* FIXED: Removed inline flex column style */}
+          <div className="voice-controls">
             
-            {/* BUTTON 1: Main Control */}
             {!lessonStarted ? (
               <button 
                 className={`voice-button ${isProcessing ? 'disabled' : ''}`}
@@ -337,7 +328,6 @@ function LessonPage({ topic, language, setLanguage }) {
             ) : (
               <button 
                 className={`voice-button ${isPlaying ? 'recording' : ''}`}
-                // Logic: If Playing -> Stop. If Paused -> Resume. If Finished -> Continue (Next Part)
                 onClick={isPlaying ? stopAudioPlayback : (isPaused ? resumeLesson : continueLesson)}
                 disabled={isProcessing || isRecording}
               >
@@ -351,7 +341,6 @@ function LessonPage({ topic, language, setLanguage }) {
               </button>
             )}
 
-            {/* BUTTON 2: Ask Question (Visible when NOT playing and NOT processing) */}
             {lessonStarted && !isPlaying && !isProcessing && (
               <button
                 className={`voice-button ${isRecording ? 'recording' : ''}`}

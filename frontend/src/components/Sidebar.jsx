@@ -8,7 +8,7 @@ function Sidebar() {
   return (
     <div className="sidebar">
       <div className="sidebar-header">
-        <h3>Mymuna NLP</h3>
+        <h3>Bilingual Educational Robot</h3>
       </div>
       <Nav className="flex-column sidebar-nav">
         <Nav.Link
@@ -35,6 +35,7 @@ function Sidebar() {
           <i className="bi bi-book"></i>
           <span>Lessons</span>
         </Nav.Link>
+        
         <Nav.Link
           as={Link}
           to="/quizzes"
@@ -43,6 +44,7 @@ function Sidebar() {
           <i className="bi bi-puzzle"></i>
           <span>Quizzes</span>
         </Nav.Link>
+        
       </Nav>
     </div>
   )
