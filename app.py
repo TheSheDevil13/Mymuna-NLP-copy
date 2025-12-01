@@ -154,6 +154,24 @@ class LessonTextRequest(BaseModel):
     topic: str
     language_code: Optional[str] = 'bn-BD'
 
+# --- NEW CLASS FOR TTS REQUEST ---
+class TTSRequest(BaseModel):
+    text: str
+    language_code: Optional[str] = 'bn-BD'
+
+# --- NEW ENDPOINT FOR TTS ---
+@app.post("/tts")
+async def text_to_speech(request: TTSRequest):
+    try:
+        audio_bytes = runTTS(request.text, return_bytes=True, language_code=request.language_code)
+        audio_base64 = base64.b64encode(audio_bytes).decode('utf-8')
+        return JSONResponse(content={
+            "audio_base64": audio_base64
+        })
+    except Exception as e:
+        print(f"Error in TTS: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/lesson/start")
 async def start_lesson(request: LessonStartRequest):
     try:

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import './LessonPage.css' // Using standard app styles
+import './LessonPage.css' 
 
 const API_BASE_URL = import.meta.env.DEV ? '/api' : 'http://localhost:8000'
 
@@ -14,6 +14,9 @@ function QuizPage({ language }) {
   const [feedback, setFeedback] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  
+  // Ref for managing audio playback
+  const audioRef = useRef(null)
 
   useEffect(() => {
     setLoading(true)
@@ -37,6 +40,69 @@ function QuizPage({ language }) {
     })
   }, [topicId])
 
+  // --- AUDIO LOGIC START ---
+  // Effect to play audio whenever the question index changes
+  useEffect(() => {
+    let isMounted = true; // Flag to track if this effect is still active
+
+    const playAudio = async () => {
+        if (questions.length === 0 || showResult) return;
+
+        const q = questions[currentQ];
+        const textToRead = language === 'bn' ? q.question_bn : q.question_en;
+
+        if (!textToRead) return;
+
+        // Stop any currently playing audio immediately
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+        }
+
+        try {
+            const langCode = language === 'bn' ? 'bn-BD' : 'en-US';
+            const response = await fetch(`${API_BASE_URL}/tts`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: textToRead, language_code: langCode })
+            });
+
+            if (!response.ok) throw new Error('TTS failed');
+            if (!isMounted) return; // If component unmounted/updated during fetch, stop here
+
+            const data = await response.json();
+            const audioBytes = Uint8Array.from(atob(data.audio_base64), c => c.charCodeAt(0));
+            const audioBlob = new Blob([audioBytes], { type: 'audio/wav' });
+            const audioUrl = URL.createObjectURL(audioBlob);
+
+            const audio = new Audio(audioUrl);
+            audioRef.current = audio;
+            
+            // Only play if we are still mounted
+            if (isMounted) {
+                audio.play().catch(e => console.error("Audio play failed", e));
+                audio.onended = () => {
+                    URL.revokeObjectURL(audioUrl);
+                };
+            }
+        } catch (err) {
+            console.error("TTS Error:", err);
+        }
+    };
+
+    playAudio();
+    
+    // Cleanup function
+    return () => {
+        isMounted = false; // Mark this run as invalid
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+        }
+    };
+  }, [currentQ, questions, language, showResult]);
+  // --- AUDIO LOGIC END ---
+
   const handleOptionClick = (option) => {
     if (selectedOption) return;
 
@@ -50,6 +116,11 @@ function QuizPage({ language }) {
       setFeedback('correct');
     } else {
       setFeedback('incorrect');
+    }
+
+    // Stop audio when user answers (optional, but good for UX)
+    if (audioRef.current) {
+        audioRef.current.pause();
     }
 
     setTimeout(() => {
@@ -69,27 +140,27 @@ function QuizPage({ language }) {
     if (percentage === 100) {
         return { 
             msg: language === 'bn' ? "🌟 অসাধারণ! তুমি সুপারস্টার! 🌟" : "🌟 Amazing! You are a Superstar! 🌟", 
-            color: "#667eea", // App Theme Blue
+            color: "#667eea", 
             bg: "#f0f2ff"
         };
     }
     if (percentage >= 80) {
         return { 
             msg: language === 'bn' ? "🎉 দারুণ করেছ! তুমি পাঠটি খুব ভালো বুঝেছ। 🎉" : "🎉 Great Job! You understood the lesson well. 🎉", 
-            color: "#4CAF50", // Success Green
+            color: "#4CAF50", 
             bg: "#E8F5E9"
         };
     }
     if (percentage >= 50) {
         return { 
             msg: language === 'bn' ? "🙂 ভালো করেছ! আরেকটু পড়লে আরও ভালো করবে। 🙂" : "🙂 Good Try! Reading the lesson again will help. 🙂", 
-            color: "#764ba2", // App Theme Purple
+            color: "#764ba2", 
             bg: "#f3eafa"
         };
     }
     return { 
         msg: language === 'bn' ? "🌱 চিন্তা করো না! চলো আবার পাঠটি পড়ি। 🌱" : "🌱 Don't worry! Let's read the lesson again. 🌱", 
-        color: "#e74c3c", // Error Red
+        color: "#e74c3c", 
         bg: "#fdeaea"
     };
   }
@@ -119,10 +190,8 @@ function QuizPage({ language }) {
   return (
     <div className="lesson-page">
       <div className="lesson-container">
-        {/* Standard Theme Border Radius and Shadow */}
         <div className="lesson-section">
           
-          {/* Standard Header (Purple Gradient) */}
           <div className="lesson-header">
             <h1>{language === 'bn' ? 'মজার কুইজ' : 'Fun Quiz'}</h1>
             <p>{topicId.replace('_', ' ').toUpperCase()}</p>
@@ -133,16 +202,15 @@ function QuizPage({ language }) {
             padding: '30px', 
             justifyContent: 'flex-start',
             minHeight: '500px',
-            background: 'white' // Ensure white background
+            background: 'white'
           }}>
             {!showResult ? (
               <>
-                {/* Progress Bar (App Theme Color) */}
                 <div style={{width: '100%', maxWidth: '600px', height: '8px', background: '#eee', borderRadius: '10px', marginBottom: '30px'}}>
                     <div style={{
                         width: `${((currentQ + 1) / questions.length) * 100}%`,
                         height: '100%',
-                        background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)', // App Theme Gradient
+                        background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)', 
                         borderRadius: '10px',
                         transition: 'width 0.5s ease'
                     }}></div>
@@ -167,12 +235,12 @@ function QuizPage({ language }) {
                     
                     if (selectedOption === opt) {
                       if (opt === correctAns) {
-                        bgColor = '#d4edda'; borderColor = '#28a745'; textColor = '#155724'; // Green
+                        bgColor = '#d4edda'; borderColor = '#28a745'; textColor = '#155724'; 
                       } else {
-                        bgColor = '#f8d7da'; borderColor = '#dc3545'; textColor = '#721c24'; // Red
+                        bgColor = '#f8d7da'; borderColor = '#dc3545'; textColor = '#721c24'; 
                       }
                     } else if (selectedOption && opt === correctAns) {
-                       bgColor = '#d4edda'; borderColor = '#28a745'; textColor = '#155724'; // Reveal correct
+                       bgColor = '#d4edda'; borderColor = '#28a745'; textColor = '#155724'; 
                     }
 
                     return (
@@ -182,9 +250,9 @@ function QuizPage({ language }) {
                         style={{
                           padding: '18px 25px',
                           fontSize: '1.2rem',
-                          borderRadius: '50px', // Standard rounded pills
-                          border: `2px solid ${selectedOption ? borderColor : 'transparent'}`, // Hide border initially for cleaner look
-                          background: selectedOption && (selectedOption === opt || opt === correctAns) ? bgColor : '#f8f9fa', // Light grey default like inputs
+                          borderRadius: '50px', 
+                          border: `2px solid ${selectedOption ? borderColor : 'transparent'}`, 
+                          background: selectedOption && (selectedOption === opt || opt === correctAns) ? bgColor : '#f8f9fa', 
                           color: textColor,
                           cursor: selectedOption ? 'default' : 'pointer',
                           transition: 'all 0.2s',
@@ -224,7 +292,6 @@ function QuizPage({ language }) {
                 )}
               </>
             ) : (
-              // Result View
               <div style={{
                   textAlign: 'center', 
                   width: '100%', 
@@ -263,7 +330,7 @@ function QuizPage({ language }) {
                 <div style={{display: 'flex', gap: '15px', flexWrap: 'wrap', justifyContent: 'center'}}>
                     <button 
                         onClick={() => { setShowResult(false); setCurrentQ(0); setScore(0); setSelectedOption(null); setFeedback(null); }}
-                        className="voice-button" // Uses standard app button style
+                        className="voice-button" 
                         style={{minWidth: '200px', padding: '15px 30px', fontSize: '1.1rem'}}
                     >
                     🔄 {language === 'bn' ? 'আবার খেলো' : 'Play Again'}
