@@ -4,7 +4,6 @@ import './LessonPage.css'
 
 const API_BASE_URL = import.meta.env.DEV ? '/api' : 'http://localhost:8000'
 
-// Added 'mode' prop with default value 'lesson'
 function LessonsListPage({ language, setLanguage, mode = 'lesson' }) {
   const [lessons, setLessons] = useState([])
 
@@ -34,7 +33,8 @@ function LessonsListPage({ language, setLanguage, mode = 'lesson' }) {
     <div className="lesson-page">
       <div className="lesson-container">
         <div className="lesson-section">
-          <div className="lesson-header" style={mode === 'quiz' ? {background: 'linear-gradient(135deg, #FF9966 0%, #FF5E62 100%)'} : {}}>
+          {/* Restored standard class without inline background override */}
+          <div className="lesson-header">
             <h1>{getPageTitle()}</h1>
             <p>{getPageSubtitle()}</p>
             
@@ -56,7 +56,6 @@ function LessonsListPage({ language, setLanguage, mode = 'lesson' }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '20px' }}>
               {lessons.map(lesson => (
                 <Link 
-                  // Dynamically determine link destination based on mode
                   to={mode === 'quiz' ? `/quiz/${lesson.id}` : `/lesson/${lesson.id}`} 
                   key={lesson.id}
                   style={{ textDecoration: 'none' }}
@@ -74,11 +73,12 @@ function LessonsListPage({ language, setLanguage, mode = 'lesson' }) {
                     alignItems: 'center',
                     justifyContent: 'center',
                     textAlign: 'center',
-                    border: mode === 'quiz' ? '2px solid #FF9966' : 'none'
+                    // Removed orange border override
+                    border: '1px solid #eee' 
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.transform = 'translateY(-5px)';
-                    e.currentTarget.style.boxShadow = '0 8px 25px rgba(0,0,0,0.15)';
+                    e.currentTarget.style.boxShadow = '0 8px 25px rgba(102, 126, 234, 0.2)'; // App theme shadow
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.transform = 'translateY(0)';
@@ -92,7 +92,7 @@ function LessonsListPage({ language, setLanguage, mode = 'lesson' }) {
                       margin: 0, 
                       color: '#333', 
                       fontSize: '1.3rem',
-                      fontWeight: '700'
+                      fontWeight: '600'
                     }}>
                       {language === 'bn' ? lesson.title_bn : lesson.title_en}
                     </h3>
