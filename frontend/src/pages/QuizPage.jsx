@@ -18,9 +18,11 @@ function QuizPage({ language }) {
   // State to track if quiz has started
   const [quizStarted, setQuizStarted] = useState(false)
   
-  // Ref for managing audio playback
+  // Refs
   const audioRef = useRef(null)
+  const timerRef = useRef(null)
 
+  // Fetch Questions
   useEffect(() => {
     setLoading(true)
     fetch(`${API_BASE_URL}/lesson/quiz`, {
@@ -43,85 +45,147 @@ function QuizPage({ language }) {
     })
   }, [topicId])
 
-  // --- AUDIO LOGIC ---
+  // Cleanup on unmount
   useEffect(() => {
-    let isMounted = true; 
-
-    const playAudio = async () => {
-        // Only play if quiz has started and result is not shown
-        if (questions.length === 0 || showResult || !quizStarted) return;
-
-        const q = questions[currentQ];
-        const textToRead = language === 'bn' ? q.question_bn : q.question_en;
-
-        if (!textToRead) return;
-
-        if (audioRef.current) {
-            audioRef.current.pause();
-            audioRef.current.currentTime = 0;
-        }
-
-        try {
-            const langCode = language === 'bn' ? 'bn-BD' : 'en-US';
-            const response = await fetch(`${API_BASE_URL}/tts`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: textToRead, language_code: langCode })
-            });
-
-            if (!response.ok) throw new Error('TTS failed');
-            if (!isMounted) return; 
-
-            const data = await response.json();
-            const audioBytes = Uint8Array.from(atob(data.audio_base64), c => c.charCodeAt(0));
-            const audioBlob = new Blob([audioBytes], { type: 'audio/wav' });
-            const audioUrl = URL.createObjectURL(audioBlob);
-
-            const audio = new Audio(audioUrl);
-            audioRef.current = audio;
-            
-            if (isMounted) {
-                audio.play().catch(e => console.error("Audio play failed", e));
-                audio.onended = () => {
-                    URL.revokeObjectURL(audioUrl);
-                };
-            }
-        } catch (err) {
-            console.error("TTS Error:", err);
-        }
-    };
-
-    playAudio();
-    
     return () => {
-        isMounted = false; 
-        if (audioRef.current) {
-            audioRef.current.pause();
-            audioRef.current.currentTime = 0;
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current.currentTime = 0
+      }
+      if (timerRef.current) {
+        clearTimeout(timerRef.current)
+      }
+    }
+  }, [])
+
+  // --- AUDIO PLAYER HELPER ---
+  const playAudio = async (text) => {
+    if (!text) return;
+
+    // Stop current audio
+    if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+    }
+
+    try {
+        const langCode = language === 'bn' ? 'bn-BD' : 'en-US';
+        const response = await fetch(`${API_BASE_URL}/tts`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, language_code: langCode })
+        });
+
+        if (!response.ok) throw new Error('TTS failed');
+
+        const data = await response.json();
+        const audioBytes = Uint8Array.from(atob(data.audio_base64), c => c.charCodeAt(0));
+        const audioBlob = new Blob([audioBytes], { type: 'audio/wav' });
+        const audioUrl = URL.createObjectURL(audioBlob);
+
+        const audio = new Audio(audioUrl);
+        audioRef.current = audio;
+        audio.play().catch(e => console.error("Audio play failed", e));
+        
+        audio.onended = () => URL.revokeObjectURL(audioUrl);
+
+    } catch (err) {
+        console.error("TTS Error:", err);
+    }
+  }
+
+  // --- RECOMMENDATION LOGIC ---
+  const getRecommendation = () => {
+    const percentage = (score / questions.length) * 100
+    
+    if (percentage === 100) {
+        return { 
+            msg: language === 'bn' ? "🌟 অসাধারণ! পরবর্তী পাঠে যাও।" : "🌟 Amazing! Move to the next lesson.", 
+            audioMsg: language === 'bn' ? "অসাধারণ! তুমি সুপারস্টার! তুমি এখন অন্য কুইজ বা পরবর্তী পাঠে যেতে পারো।" : "Amazing! You are a Superstar! You should try other quizzes now.",
+            color: "#667eea", 
+            bg: "#f0f2ff",
+            actionType: 'next'
+        };
+    }
+    if (percentage >= 80) {
+        return { 
+            msg: language === 'bn' ? "🎉 দারুণ! অন্য কুইজ চেষ্টা করো।" : "🎉 Great Job! Try other quizzes.", 
+            audioMsg: language === 'bn' ? "দারুণ করেছ! তুমি খুব ভালো বুঝেছ। চলো অন্য কুইজ খেলি।" : "Great Job! You understood well. Let's try other quizzes.",
+            color: "#4CAF50", 
+            bg: "#E8F5E9",
+            actionType: 'next'
+        };
+    }
+    if (percentage >= 50) {
+        return { 
+            msg: language === 'bn' ? "🙂 ভালো করেছ! আরেকটু পড়লে ভালো করবে।" : "🙂 Good Try! Reading the lesson again will help.", 
+            audioMsg: language === 'bn' ? "ভালো করেছ! তবে পাঠটি আরেকবার পড়লে আরও ভালো করবে।" : "Good Try! Reading the lesson again will help you improve.",
+            color: "#764ba2", 
+            bg: "#f3eafa",
+            actionType: 'review'
+        };
+    }
+    return { 
+        msg: language === 'bn' ? "🌱 চিন্তা করো না! চলো আবার পাঠটি পড়ি।" : "🌱 Don't worry! Let's read the lesson again.", 
+        audioMsg: language === 'bn' ? "চিন্তা করো না! চলো আমরা আবার পাঠটি পড়ি।" : "Don't worry! Let's go back and read the lesson again.",
+        color: "#e74c3c", 
+        bg: "#fdeaea",
+        actionType: 'review'
+    };
+  }
+
+  // --- EFFECT: MANAGE AUDIO FLOW ---
+  useEffect(() => {
+    if (!quizStarted || questions.length === 0) return;
+
+    let timeoutId;
+
+    const runAudioSequence = async () => {
+        if (showResult) {
+            // CASE 1: Result Screen - Play Recommendation
+            timeoutId = setTimeout(() => {
+                const rec = getRecommendation();
+                playAudio(rec.audioMsg);
+            }, 500);
+        } else {
+            // CASE 2: Question Screen - Play Question
+            const q = questions[currentQ];
+            const textToRead = language === 'bn' ? q.question_bn : q.question_en;
+            timeoutId = setTimeout(() => playAudio(textToRead), 500);
         }
     };
-  }, [currentQ, questions, language, showResult, quizStarted]);
 
+    runAudioSequence();
+
+    return () => clearTimeout(timeoutId);
+  }, [currentQ, quizStarted, showResult, questions, language]);
+
+
+  // --- HANDLE ANSWER ---
   const handleOptionClick = (option) => {
-    if (selectedOption) return;
+    if (selectedOption) return; // Prevent multiple clicks
 
     setSelectedOption(option);
     
     const correctKey = language === 'bn' ? 'correct_answer_bn' : 'correct_answer_en';
     const isCorrect = option === questions[currentQ][correctKey];
 
+    let feedbackText = "";
+    
     if (isCorrect) {
       setScore(score + 1);
       setFeedback('correct');
+      feedbackText = language === 'bn' ? "সঠিক উত্তর!" : "That's correct!";
     } else {
       setFeedback('incorrect');
+      feedbackText = language === 'bn' ? "ভুল উত্তর।" : "That's incorrect.";
     }
 
-    if (audioRef.current) {
-        audioRef.current.pause();
-    }
+    // Play immediate feedback
+    playAudio(feedbackText);
 
-    setTimeout(() => {
+    // Wait and Go to Next
+    timerRef.current = setTimeout(() => {
       if (currentQ + 1 < questions.length) {
         setCurrentQ(currentQ + 1);
         setSelectedOption(null);
@@ -129,38 +193,7 @@ function QuizPage({ language }) {
       } else {
         setShowResult(true);
       }
-    }, 1500);
-  }
-
-  const getRecommendation = () => {
-    const percentage = (score / questions.length) * 100
-    
-    if (percentage === 100) {
-        return { 
-            msg: language === 'bn' ? "🌟 অসাধারণ! তুমি সুপারস্টার! 🌟" : "🌟 Amazing! You are a Superstar! 🌟", 
-            color: "#667eea", 
-            bg: "#f0f2ff"
-        };
-    }
-    if (percentage >= 80) {
-        return { 
-            msg: language === 'bn' ? "🎉 দারুণ করেছ! তুমি পাঠটি খুব ভালো বুঝেছ। 🎉" : "🎉 Great Job! You understood the lesson well. 🎉", 
-            color: "#4CAF50", 
-            bg: "#E8F5E9"
-        };
-    }
-    if (percentage >= 50) {
-        return { 
-            msg: language === 'bn' ? "🙂 ভালো করেছ! আরেকটু পড়লে আরও ভালো করবে। 🙂" : "🙂 Good Try! Reading the lesson again will help. 🙂", 
-            color: "#764ba2", 
-            bg: "#f3eafa"
-        };
-    }
-    return { 
-        msg: language === 'bn' ? "🌱 চিন্তা করো না! চলো আবার পাঠটি পড়ি। 🌱" : "🌱 Don't worry! Let's read the lesson again. 🌱", 
-        color: "#e74c3c", 
-        bg: "#fdeaea"
-    };
+    }, 1500); 
   }
 
   if (loading) return (
@@ -184,6 +217,7 @@ function QuizPage({ language }) {
   const questionText = language === 'bn' ? q.question_bn : q.question_en;
   const options = language === 'bn' ? q.options_bn : q.options_en;
   const correctAns = language === 'bn' ? q.correct_answer_bn : q.correct_answer_en;
+  const rec = showResult ? getRecommendation() : null;
 
   return (
     <div className="lesson-page">
@@ -305,8 +339,17 @@ function QuizPage({ language }) {
                   })}
                 </div>
                 
-                {/* Feedback Text Removed Here */}
-                
+                {feedback && (
+                  <div style={{
+                      fontSize: '1.5rem', 
+                      marginTop: '30px', 
+                      fontWeight: 'bold',
+                      color: feedback === 'correct' ? '#28a745' : '#dc3545',
+                      animation: 'fadeIn 0.3s'
+                  }}>
+                    {/* Visual feedback only - audio handled separately */}
+                  </div>
+                )}
               </>
             ) : (
               // --- RESULT SCREEN ---
@@ -327,48 +370,62 @@ function QuizPage({ language }) {
                     color: '#333', 
                     marginBottom: '20px',
                 }}>
-                  <span style={{color: getRecommendation().color}}>{score}</span>
+                  <span style={{color: rec.color}}>{score}</span>
                   <span style={{color: '#ccc', fontSize: '3rem'}}>/</span>
                   <span style={{color: '#ccc', fontSize: '3rem'}}>{questions.length}</span>
                 </div>
 
                 <div style={{
                     padding: '30px', 
-                    background: getRecommendation().bg, 
+                    background: rec.bg, 
                     borderRadius: '15px',
                     marginBottom: '40px',
                     maxWidth: '600px',
-                    borderLeft: `5px solid ${getRecommendation().color}`
+                    borderLeft: `5px solid ${rec.color}`
                 }}>
                   <p style={{fontSize: '1.4rem', fontWeight: '500', color: '#444', margin: 0}}>
-                    {getRecommendation().msg}
+                    {rec.msg}
                   </p>
                 </div>
                 
                 <div style={{display: 'flex', gap: '15px', flexWrap: 'wrap', justifyContent: 'center'}}>
+                    
+                    {/* PRIMARY ACTION BASED ON SCORE */}
+                    {rec.actionType === 'review' ? (
+                        <Link to={`/lesson/${topicId}`} style={{textDecoration: 'none'}}>
+                            <button 
+                                className="voice-button" 
+                                style={{minWidth: '220px', padding: '15px 30px', fontSize: '1.1rem'}}
+                            >
+                            📖 {language === 'bn' ? 'পাঠটি পড়ো' : 'Read Lesson'}
+                            </button>
+                        </Link>
+                    ) : (
+                        <Link to="/quizzes" style={{textDecoration: 'none'}}>
+                            <button 
+                                className="voice-button" 
+                                style={{minWidth: '220px', padding: '15px 30px', fontSize: '1.1rem'}}
+                            >
+                            🧩 {language === 'bn' ? 'অন্য কুইজ' : 'Other Quizzes'}
+                            </button>
+                        </Link>
+                    )}
+
+                    {/* SECONDARY ACTION */}
                     <button 
                         onClick={() => { setShowResult(false); setCurrentQ(0); setScore(0); setSelectedOption(null); setFeedback(null); setQuizStarted(false); }}
                         className="voice-button" 
-                        style={{minWidth: '200px', padding: '15px 30px', fontSize: '1.1rem'}}
+                        style={{
+                            minWidth: '200px', 
+                            padding: '15px 30px', 
+                            fontSize: '1.1rem',
+                            background: 'white',
+                            color: '#667eea',
+                            border: '2px solid #667eea'
+                        }}
                     >
                     🔄 {language === 'bn' ? 'আবার খেলো' : 'Play Again'}
                     </button>
-
-                    <Link to="/quizzes" style={{textDecoration: 'none'}}>
-                        <button 
-                            className="voice-button" 
-                            style={{
-                                minWidth: '200px', 
-                                padding: '15px 30px', 
-                                fontSize: '1.1rem',
-                                background: 'white',
-                                color: '#667eea',
-                                border: '2px solid #667eea'
-                            }}
-                        >
-                        ⬅️ {language === 'bn' ? 'অন্য কুইজ' : 'Other Quizzes'}
-                        </button>
-                    </Link>
                 </div>
               </div>
             )}
